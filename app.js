@@ -15,10 +15,11 @@ const port = 3000;
 
 
 app.use(cors({
-  origin: 'http://localhost:8080',
-  methods:  ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  origin: 'https://your-frontend-app.onrender.com', // <-- CHANGE THIS to your actual deployed frontend URL
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: false
 }));
+
 app.use(bodyParser.json());
 app.use('/api/admins', adminRoutes);
 app.use('/api/admin', adminRoutes);
