@@ -17,19 +17,22 @@ const port = 3000;
 
 const allowedOrigins = [
   'http://localhost:8080',
-  'http://127.0.0.1:5500'
+  'http://127.0.0.1:5500',
+  'https://rfid-attendancesystem-frontend.netlify.app',
+  'https://rfid-attendancesystem-backend-project.onrender.com'
 ];
+
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // Allow Postman, curl, etc.
+    if (!origin) return callback(null, true); // Allow non-browser requests
     if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+      callback(null, true);
     } else {
-      return callback(new Error('CORS not allowed for this origin'), false);
+      callback(new Error('CORS not allowed for this origin'), false);
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  credentials: true // Set to true if your frontend will use cookies or auth headers
+  credentials: false,
 }));
 
 
