@@ -17,22 +17,22 @@ const port = 3000;
 
 const allowedOrigins = [
   'http://localhost:8080',
-  'https://rfid-attendancesystem-backend-project.onrender.com',
-
+  'http://127.0.0.1:5500'
 ];
-
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // For same-origin requests or tools like Postman
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    if (!origin) return callback(null, true); // Allow Postman, curl, etc.
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('CORS not allowed for this origin'), false);
     }
-    return callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  credentials: false
+  credentials: true // Set to true if your frontend will use cookies or auth headers
 }));
+
+
 
 
 app.use(bodyParser.json());
