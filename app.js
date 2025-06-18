@@ -18,7 +18,7 @@ const port = 3000;
 const allowedOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:5500',
-  'https://rfid-attendancesystem-frontend.netlify.app',
+  'https://rfid-attendance-synctuario-theta.vercel.app',
   'https://rfid-attendancesystem-backend-project.onrender.com'
 ];
 
