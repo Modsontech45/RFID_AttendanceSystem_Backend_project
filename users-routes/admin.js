@@ -47,7 +47,8 @@ router.post('/signup', async (req, res) => {
       [firstname, lastname, email, hashedPassword, verificationToken]
     );
 
-    const verifyLink = `https://rfid-attendancesystem-backend-project.onrender.com/pages/users/reset/verify.html?token=${encodeURIComponent(verificationToken)}`;
+const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/verify.html?token=${encodeURIComponent(verificationToken)}`;
+
 
     // Email HTML Template
     const emailTemplate = `
