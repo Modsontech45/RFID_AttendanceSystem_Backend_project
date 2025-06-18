@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendResetEmail = async (email, token) => {
-  const resetLink = `http://localhost:8080/pages/users/reset/reset-password.html?token=${encodeURIComponent(token)}`;
+  const resetLink = `https://rfid-attendancesystem-backend-project.onrender.com/pages/users/reset/reset-password.html?token=${encodeURIComponent(token)}`;
 
   const mailOptions = {
     from: '"Synctuario Support" <tandemodson41@gmail.com>',
