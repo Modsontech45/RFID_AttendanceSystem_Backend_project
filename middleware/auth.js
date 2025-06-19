@@ -26,6 +26,11 @@ const authenticateAdmin = (req, res, next) => {
   });
 };
 
+
+
+
+
+
 const authenticateTeacher = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader)
