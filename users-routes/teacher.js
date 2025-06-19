@@ -93,7 +93,7 @@ router.delete("/:id", authenticateAdmin, async (req, res) => {
   const adminId = req.admin.id;
 
   try {
-
+    // Verify teacher exists and belongs to admin
     const result = await pool.query(
       "SELECT email FROM teachers WHERE id = $1 AND added_by = $2",
       [teacherId, adminId]
@@ -105,21 +105,27 @@ router.delete("/:id", authenticateAdmin, async (req, res) => {
 
     const { email } = result.rows[0];
 
-
+    // Delete the teacher
     await pool.query("DELETE FROM teachers WHERE id = $1", [teacherId]);
 
+    // Send notification email but do not block delete success
+    try {
+      const subject = "Teacher Account Removal";
+      const message = "You have been removed from the system by your admin. If you believe this is a mistake, please contact them.";
+      await sendEmail(email, subject, message);
+    } catch (emailErr) {
+      console.error("Failed to send removal email:", emailErr);
+      // Do NOT fail the request because of email failure
+    }
 
-    const subject = "Teacher Account Removal";
-    const message = "You have been removed from the system by your admin. If you believe this is a mistake, please contact them.";
-
-    await sendEmail(email, subject, message);
-
-    res.status(200).json({ message: "Teacher deleted successfully." });
+    // Success response
+    return res.status(200).json({ message: "Teacher deleted successfully." });
   } catch (err) {
     console.error("Error deleting teacher:", err);
-    res.status(500).json({ message: "An error occurred while deleting the teacher." });
+    return res.status(500).json({ message: "An error occurred while deleting the teacher." });
   }
 });
+
 
 
 router.get("/me", authenticateTeacher, async (req, res) => {
