@@ -10,19 +10,20 @@ const transporter = nodemailer.createTransport({
 });
 
 
-const sendAcceptanceEmail = async (to) => {
+const sendAcceptanceEmail = async (to, subject, message) => {
   try {
     await transporter.sendMail({
       from: `"School Admin" <tandemodson41@gmail.com>`,
       to,
-      subject: "You've been added as a Teacher",
-      text: `Hello! You have been added to the system as a teacher. You can now log in using your email.`,
+      subject,
+      text: message,
     });
-    console.log(`✅ Acceptance email sent to ${to}`);
+    console.log(`✅ Email sent to ${to}`);
   } catch (error) {
     console.error(`❌ Failed to send email to ${to}:`, error);
   }
 };
+
 
 
 module.exports = { sendAcceptanceEmail };
