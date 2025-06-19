@@ -70,7 +70,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Admin gets all teachers they added
+
 router.get("/all", authenticateAdmin, async (req, res) => {
   const adminId = req.admin.id;
 
@@ -87,42 +87,41 @@ router.get("/all", authenticateAdmin, async (req, res) => {
   }
 });
 
+
 router.delete("/:id", authenticateAdmin, async (req, res) => {
   const teacherId = req.params.id;
   const adminId = req.admin.id;
 
   try {
-    // Check if teacher exists and was added by the current admin
+
     const result = await pool.query(
-      "SELECT * FROM teachers WHERE id = $1 AND added_by = $2",
+      "SELECT email FROM teachers WHERE id = $1 AND added_by = $2",
       [teacherId, adminId]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Teacher not found or not authorized." });
+      return res.status(404).json({ message: "Teacher not found or unauthorized action." });
     }
 
     const { email } = result.rows[0];
 
-    // Delete the teacher
+
     await pool.query("DELETE FROM teachers WHERE id = $1", [teacherId]);
 
-    // Send removal email
-    const subject = "Teacher Removal";
-    const message = `We're sorry to inform you that you have been removed from the team by your admin.`;
+
+    const subject = "Teacher Account Removal";
+    const message = "You have been removed from the system by your admin. If you believe this is a mistake, please contact them.";
 
     await sendEmail(email, subject, message);
 
     res.status(200).json({ message: "Teacher deleted successfully." });
   } catch (err) {
     console.error("Error deleting teacher:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "An error occurred while deleting the teacher." });
   }
 });
 
 
-
-// Teacher gets own profile (must come BEFORE /:id)
 router.get("/me", authenticateTeacher, async (req, res) => {
   const teacherId = req.teacher.id;
 
@@ -140,7 +139,7 @@ router.get("/me", authenticateTeacher, async (req, res) => {
   }
 });
 
-// Teacher updates own profile (partial update)
+
 router.patch("/me", authenticateTeacher, async (req, res) => {
   const teacherId = req.teacher.id;
   const { full_name, bio, picture } = req.body;
