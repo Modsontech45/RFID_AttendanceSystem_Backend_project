@@ -44,7 +44,7 @@ router.post('/signup', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, false, $6) RETURNING *`,
       [firstname, lastname, email, hashedPassword, apiKey, verificationToken]
     );
-
+    console.log("✅ Admin created:", result.rows[0]);
     const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/verify.html?token=${encodeURIComponent(verificationToken)}`;
 
     const emailTemplate = `
