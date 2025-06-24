@@ -16,16 +16,25 @@ router.post("/add", authenticateAdmin, async (req, res) => {
   const adminId = req.admin.id;
 
   try {
-    const exists = await pool.query("SELECT 1 FROM teachers WHERE email = $1", [
-      email,
-    ]);
+    // Check if teacher already exists
+    const exists = await pool.query("SELECT 1 FROM teachers WHERE email = $1", [email]);
     if (exists.rows.length > 0)
       return res.status(409).json({ message: "Teacher already exists" });
 
+    // ✅ Get the admin's API key
+    const adminData = await pool.query("SELECT api_key FROM admins WHERE id = $1", [adminId]);
+    const adminApiKey = adminData.rows[0]?.api_key;
+
+    if (!adminApiKey) {
+      return res.status(400).json({ message: "API key not found for admin" });
+    }
+
+    // ✅ Add the teacher and include the API key
     const result = await pool.query(
-      "INSERT INTO teachers (email, added_by) VALUES ($1, $2) RETURNING *",
-      [email, adminId]
+      "INSERT INTO teachers (email, added_by, api_key) VALUES ($1, $2, $3) RETURNING *",
+      [email, adminId, adminApiKey]
     );
+
     const subject = "Welcome to the Team";
     const message = `Hello! You have been added to the system as a teacher.
 You can now log in using your email.
@@ -34,14 +43,17 @@ Login link: https://www.rfid-attendance-synctuario-theta.vercel.app`;
 
     await sendAcceptanceEmail(email, subject, message);
 
-    res
-      .status(201)
-      .json({ message: "Teacher added and notified", teacher: result.rows[0] });
+    res.status(201).json({
+      message: "Teacher added and notified",
+      teacher: result.rows[0]
+    });
+
   } catch (err) {
-    console.error("Error adding teacher:", err);
+    console.error("❌ Error adding teacher:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 // Teacher login (generate JWT token)
 router.post("/login", async (req, res) => {
