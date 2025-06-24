@@ -2,29 +2,26 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
-require('dotenv').config();
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+require('dotenv').config();
 
 const router = express.Router();
-
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
+    pass: process.env.EMAIL_PASS,
+  },
 });
-
-
 
 if (!process.env.JWT_SECRET) {
   console.error("❌ JWT_SECRET is missing in environment variables.");
   process.exit(1);
 }
 
-// Admin Signup with Email Verification
+// ✅ Admin Signup
 router.post('/signup', async (req, res) => {
   const { firstname, lastname, email, password } = req.body;
 
@@ -40,17 +37,16 @@ router.post('/signup', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString('hex');
+    const apiKey = crypto.randomBytes(32).toString('hex'); // ✅ Generate API Key
 
     const result = await pool.query(
-      `INSERT INTO admins (firstname, lastname, email, password, verified, verification_token)
-       VALUES ($1, $2, $3, $4, false, $5) RETURNING *`,
-      [firstname, lastname, email, hashedPassword, verificationToken]
+      `INSERT INTO admins (firstname, lastname, email, password, api_key, verified, verification_token)
+       VALUES ($1, $2, $3, $4, $5, false, $6) RETURNING *`,
+      [firstname, lastname, email, hashedPassword, apiKey, verificationToken]
     );
 
-const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/verify.html?token=${encodeURIComponent(verificationToken)}`;
+    const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/verify.html?token=${encodeURIComponent(verificationToken)}`;
 
-
-    // Email HTML Template
     const emailTemplate = `
       <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
         <div style="background: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;">
@@ -81,6 +77,7 @@ const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/us
   }
 });
 
+// ✅ Email Verification
 router.get('/verify/:token', async (req, res) => {
   const { token } = req.params;
 
@@ -96,8 +93,6 @@ router.get('/verify/:token', async (req, res) => {
     }
 
     console.log(`✅ Email verified for: ${result.rows[0].email}`);
-
-    // Respond JSON, frontend can handle redirect after success
     res.json({ message: 'Email verified successfully. You can now log in.' });
 
   } catch (err) {
@@ -106,14 +101,11 @@ router.get('/verify/:token', async (req, res) => {
   }
 });
 
-
-
 // ✅ Admin Login
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    console.log("❌ Login failed: Missing fields");
     return res.status(400).json({ message: 'Email and password are required' });
   }
 
@@ -122,19 +114,23 @@ router.post('/login', async (req, res) => {
     const admin = result.rows[0];
 
     if (!admin) {
-      console.log(`❌ Login failed: Admin not found (${email})`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     if (!admin.verified) {
-      console.log(`❌ Login failed: Admin email not verified (${email})`);
       return res.status(403).json({ message: 'Please verify your email before logging in.' });
     }
 
     const match = await bcrypt.compare(password, admin.password);
     if (!match) {
-      console.log(`❌ Login failed: Incorrect password for ${email}`);
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // ✅ Ensure API key exists
+    let apiKey = admin.api_key;
+    if (!apiKey) {
+      apiKey = crypto.randomBytes(32).toString('hex');
+      await pool.query('UPDATE admins SET api_key = $1 WHERE id = $2', [apiKey, admin.id]);
     }
 
     const token = jwt.sign(
@@ -144,13 +140,24 @@ router.post('/login', async (req, res) => {
     );
 
     console.log(`✅ Admin logged in: ${email}`);
-    res.status(200).json({ message: 'Login successful', token });
+    res.status(200).json({
+      message: 'Login successful',
+      token,
+      admin: {
+        id: admin.id,
+        firstname: admin.firstname,
+        lastname: admin.lastname,
+        email: admin.email,
+        role: admin.role,
+        api_key: apiKey,
+        created_at: admin.created_at,
+      },
+    });
 
   } catch (err) {
     console.error("❌ Error during admin login:", err.message);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
-
 
 module.exports = router;
