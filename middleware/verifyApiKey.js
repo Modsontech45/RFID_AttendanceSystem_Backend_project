@@ -10,12 +10,14 @@ module.exports = async function verifyApiKey(req, res, next) {
       return res.status(400).json({ message: "API key required" });
     }
 
-    const userCheck = await pool.query(
-      `SELECT * FROM admins WHERE api_key = $1
-       UNION
-       SELECT * FROM teachers WHERE api_key = $1`,
-      [apiKey]
-    );
+const userCheck = await pool.query(
+  `
+  SELECT id, email, api_key, 'admin' AS role FROM admins WHERE api_key = $1
+  UNION
+  SELECT id, email, api_key, 'teacher' AS role FROM teachers WHERE api_key = $1
+  `,
+  [apiKey]
+);
 
     if (userCheck.rows.length === 0) {
       return res.status(403).json({ message: "Invalid API key" });
