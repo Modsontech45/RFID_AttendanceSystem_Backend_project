@@ -1,20 +1,22 @@
 const express = require("express");
 const pool = require("../db");
 const router = express.Router();
+const verifyApiKey = require("../middleware/verifyApiKey");
 const nodemailer = require('nodemailer');
 
 // Get all students
-router.get("/", async (req, res) => {
+router.get("/", verifyApiKey, async (req, res) => {
   try {
-    const students = await pool.query("SELECT * FROM students");
-    if (students.rows.length > 0) {
-      res.status(200).json(students.rows);
+    const result = await pool.query("SELECT * FROM students");
+
+    if (result.rows.length > 0) {
+      return res.status(200).json(result.rows);
     } else {
-      res.status(404).json({ message: "No student found" });
+      return res.status(404).json({ message: "No students found" });
     }
   } catch (err) {
     console.error("Error fetching students:", err);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
