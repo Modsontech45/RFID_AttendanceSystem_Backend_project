@@ -4,21 +4,34 @@ const router = express.Router();
 const verifyApiKey = require("../middleware/verifyApiKey");
 const nodemailer = require('nodemailer');
 
-// Get all students
 router.get("/", verifyApiKey, async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM students");
+    // Get the api_key from the logged in user
+    const requesterApiKey = req.user.api_key;
+    const requesterRole = req.user.role;
 
-    if (result.rows.length > 0) {
-      return res.status(200).json(result.rows);
-    } else {
-      return res.status(404).json({ message: "No students found" });
+    if (!requesterApiKey) {
+      return res.status(403).json({ message: "No API key found for user" });
     }
+
+    // Fetch students where api_key matches the requester’s api_key
+    const studentsResult = await pool.query(
+      "SELECT * FROM students WHERE api_key = $1",
+      [requesterApiKey]
+    );
+
+    if (studentsResult.rows.length === 0) {
+      return res.status(403).json({ message: "No students found with your API key" });
+    }
+
+    res.status(200).json(studentsResult.rows);
+
   } catch (err) {
     console.error("Error fetching students:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 // Update UID
 router.patch("/:oldUid/update-uid", async (req, res) => {
