@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../db");
+const verifyApiKey = require("../middleware/verifyApiKey");
 const {
   authenticateAdmin,
   authenticateTeacher,
@@ -83,13 +84,20 @@ router.post("/login", async (req, res) => {
 });
 
 
-router.get("/all", authenticateAdmin, async (req, res) => {
-  const adminId = req.admin.id;
+router.get("/all", verifyApiKey, async (req, res) => {
+  const requester = req.user;
 
   try {
+    // Only allow admins to fetch teachers they added using same api_key
+    if (requester.role !== "admin") {
+      return res.status(403).json({ message: "Only admins can view this resource" });
+    }
+
     const result = await pool.query(
-      "SELECT * FROM teachers WHERE added_by = $1 ORDER BY created_at DESC",
-      [adminId]
+      `SELECT * FROM teachers
+       WHERE added_by = $1 AND api_key = $2
+       ORDER BY created_at DESC`,
+      [requester.id, requester.api_key]
     );
 
     res.status(200).json({ teachers: result.rows });
@@ -98,7 +106,6 @@ router.get("/all", authenticateAdmin, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 router.delete("/:id", authenticateAdmin, async (req, res) => {
   const teacherId = req.params.id;
