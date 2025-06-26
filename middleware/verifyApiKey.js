@@ -2,9 +2,8 @@ const pool = require("../db");
 
 module.exports = async function verifyApiKey(req, res, next) {
   try {
-    // Safely access req.body.api_key even if req.body is undefined
     const apiKey =
-      (req.body && req.body.api_key) ||
+      (req.body && req.body.api_key) || // safe check req.body
       req.query.api_key ||
       req.headers["x-api-key"];
 
@@ -14,31 +13,25 @@ module.exports = async function verifyApiKey(req, res, next) {
       return res.status(400).json({ message: "API key required" });
     }
 
-    // Check in admins
+    // Check admins
     const adminCheck = await pool.query(
       "SELECT id, email, api_key FROM admins WHERE api_key = $1",
       [apiKey]
     );
 
     if (adminCheck.rows.length > 0) {
-      req.user = {
-        ...adminCheck.rows[0],
-        role: "admin"
-      };
+      req.user = { ...adminCheck.rows[0], role: "admin" };
       return next();
     }
 
-    // Check in teachers
+    // Check teachers
     const teacherCheck = await pool.query(
       "SELECT id, email, api_key FROM teachers WHERE api_key = $1",
       [apiKey]
     );
 
     if (teacherCheck.rows.length > 0) {
-      req.user = {
-        ...teacherCheck.rows[0],
-        role: "teacher"
-      };
+      req.user = { ...teacherCheck.rows[0], role: "teacher" };
       return next();
     }
 
