@@ -45,8 +45,8 @@ router.post('/', async (req, res) => {
       console.log('✅ Attendance initialized for all students:', dateStr);
     }
 
-    const isSignInTime = hour >= 12 && hour < 21;
-    const isSignOutTime = hour >= 22 && hour < 24;
+    const isSignInTime = hour >= 1 && hour < 8;
+    const isSignOutTime = hour >= 14 && hour < 15;
 
     if (!isSignInTime && !isSignOutTime) {
       latestScan = {
