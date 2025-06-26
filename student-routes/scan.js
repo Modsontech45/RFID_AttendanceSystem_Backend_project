@@ -30,20 +30,16 @@ router.post('/', async (req, res) => {
     const dateStr = now.toISOString().slice(0, 10);
     const hour = now.getHours();
 
-//     const dateStr = "2025-06-16"; // hardcoded date in YYYY-MM-DD format
-// const hour = 14; // hardcoded hour in 24-hour format (e.g., 14 for 2 PM)
-
-
- 
+    // Check if attendance already initialized for today
     const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
 
     if (parseInt(attendanceCheck.rows[0].count) === 0) {
-      const allStudents = await pool.query('SELECT uid, name, form FROM students');
+      const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
       for (const s of allStudents.rows) {
         await pool.query(
-          `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status)
-           VALUES ($1, $2, $3, $4, false, false, 'absent')`,
-          [s.uid, s.name, s.form, dateStr]
+          `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key)
+           VALUES ($1, $2, $3, $4, false, false, 'absent', $5)`,
+          [s.uid, s.name, s.form, dateStr, s.api_key]
         );
       }
       console.log('✅ Attendance initialized for all students:', dateStr);
@@ -63,6 +59,7 @@ router.post('/', async (req, res) => {
       return res.json({ message: 'Outside allowed sign-in/sign-out time', flag: 'Outside Time', sign: 0 });
     }
 
+    // Get attendance record for this uid and date
     const attendanceRes = await pool.query(
       'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
       [uid, dateStr]
