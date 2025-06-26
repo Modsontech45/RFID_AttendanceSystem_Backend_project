@@ -2,7 +2,11 @@ const pool = require("../db");
 
 module.exports = async function verifyApiKey(req, res, next) {
   try {
-    const apiKey = req.body.api_key || req.query.api_key || req.headers["x-api-key"];
+    // Safely access req.body.api_key even if req.body is undefined
+    const apiKey =
+      (req.body && req.body.api_key) ||
+      req.query.api_key ||
+      req.headers["x-api-key"];
 
     console.log("🔑 Received API Key:", apiKey);
 
