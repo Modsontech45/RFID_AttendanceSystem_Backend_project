@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const router = express.Router();
-const cron = require('node-cron');
+
 
 
 
@@ -134,30 +134,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-cron.schedule('0 0 * * *', async () => {
-  try {
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10);
 
-    const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
-
-    if (parseInt(attendanceCheck.rows[0].count) === 0) {
-      const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
-      for (const s of allStudents.rows) {
-        await pool.query(
-          `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key)
-           VALUES ($1, $2, $3, $4, false, false, 'absent', $5)`,
-          [s.uid, s.name, s.form, dateStr, s.api_key]
-        );
-      }
-      console.log('✅ Daily Attendance Initialized at Midnight:', dateStr);
-    } else {
-      console.log('ℹ️ Attendance already initialized for:', dateStr);
-    }
-  } catch (err) {
-    console.error('❌ Cron job failed:', err.message);
-  }
-});
 
 router.get('/queue', (req, res) => {
   if (latestScan) {
