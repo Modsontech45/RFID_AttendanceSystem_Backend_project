@@ -2,45 +2,59 @@ const express = require('express');
 const pool = require('../db');
 const router = express.Router();
 
-
-
-
-
-
-
-let latestScan = null;
-
+// POST /scans
 router.post('/', async (req, res) => {
-  const { uid } = req.body;
+  const { uid, device_uid, api_key } = req.body;
   const now = new Date();
 
-  if (!uid) {
-    latestScan = { uid: null, exists: false, message: 'UID is required.' };
-    return res.status(400).json({ message: 'UID is required.', sign: 0 });
+  if (!uid || !device_uid || !api_key) {
+    return res.status(400).json({ message: 'Missing uid, device_uid, or api_key.', sign: 0 });
   }
 
   try {
-    const studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
+    // Check if UID belongs to a registered student
+    const studentRes = await pool.query(
+      'SELECT * FROM students WHERE uid = $1 AND api_key = $2',
+      [uid, api_key]
+    );
 
+    // If not found, add to pending_scans
     if (studentRes.rows.length === 0) {
-      latestScan = {
-        uid,
-        exists: false,
+      const existingPending = await pool.query(
+        'SELECT * FROM pending_scans WHERE uid = $1 AND device_uid = $2 AND api_key = $3',
+        [uid, device_uid, api_key]
+      );
+
+      if (existingPending.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO pending_scans (uid, device_uid, api_key)
+           VALUES ($1, $2, $3)`,
+          [uid, device_uid, api_key]
+        );
+      }
+
+      return res.json({
         message: 'New UID - Registration required',
-        timestamp: now,
-      };
-      return res.json({ message: 'New UID - Registration required', flag: 'Register now', sign: 2 });
+        flag: 'Register now',
+        sign: 2
+      });
     }
 
+    // Attendance logic
     const student = studentRes.rows[0];
     const dateStr = now.toISOString().slice(0, 10);
     const hour = now.getHours();
 
-    // Check if attendance already initialized for today
-    const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
+    const attendanceCheck = await pool.query(
+      'SELECT COUNT(*) FROM attendance WHERE date = $1',
+      [dateStr]
+    );
 
     if (parseInt(attendanceCheck.rows[0].count) === 0) {
-      const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
+      const allStudents = await pool.query(
+        'SELECT uid, name, form, api_key FROM students'
+      );
+
       for (const s of allStudents.rows) {
         await pool.query(
           `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key)
@@ -48,24 +62,19 @@ router.post('/', async (req, res) => {
           [s.uid, s.name, s.form, dateStr, s.api_key]
         );
       }
-      console.log('✅ Attendance initialized for all students:', dateStr);
     }
 
     const isSignInTime = hour >= 17 && hour < 19;
     const isSignOutTime = hour >= 20 && hour < 22;
 
     if (!isSignInTime && !isSignOutTime) {
-      latestScan = {
-        uid,
-        exists: true,
-        name: student.name,
-        timestamp: now,
+      return res.json({
         message: 'Outside allowed sign-in/sign-out time',
-      };
-      return res.json({ message: 'Outside allowed sign-in/sign-out time', flag: 'Outside Time', sign: 0 });
+        flag: 'Outside Time',
+        sign: 0
+      });
     }
 
-    // Get attendance record for this uid and date
     const attendanceRes = await pool.query(
       'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
       [uid, dateStr]
@@ -81,25 +90,19 @@ router.post('/', async (req, res) => {
 
     if (isSignOutTime && !signed_out) {
       if (!signed_in) {
-        latestScan = {
-          uid,
-          exists: true,
-          name: student.name,
-          timestamp: now,
+        return res.json({
           message: 'Sign-in required before sign-out',
-        };
-        return res.json({ message: 'Sign-in required before sign-out', flag: 'SignIn 1st', sign: 3 });
+          flag: 'SignIn 1st',
+          sign: 3
+        });
       }
       sign_out_time = now;
       signed_out = true;
     }
 
     let status = 'absent';
-    if (signed_in && signed_out) {
-      status = 'present';
-    } else if (signed_in) {
-      status = 'partial';
-    }
+    if (signed_in && signed_out) status = 'present';
+    else if (signed_in) status = 'partial';
 
     await pool.query(
       `UPDATE attendance
@@ -108,41 +111,35 @@ router.post('/', async (req, res) => {
       [sign_in_time, sign_out_time, signed_in, signed_out, status, existing.id]
     );
 
-    latestScan = {
-      uid,
-      exists: true,
-      name: student.name,
-      timestamp: now,
-      message: isSignInTime ? 'Signed in' : 'Signed out',
-    };
-
     return res.json({
       message: isSignInTime ? 'Signed in' : 'Signed out',
       flag: isSignInTime ? 'Signed In' : 'Signed Out',
-      sign: 1,
+      sign: 1
     });
 
   } catch (err) {
     console.error('❌ Error processing scan:', err.message);
-    latestScan = {
-      uid,
-      exists: false,
-      message: 'Error during scan processing',
-      error: err.message,
-    };
     return res.status(500).json({ message: 'Scan failed', error: err.message, sign: 0 });
   }
 });
 
+// GET /pending-scans
+router.get('/pending-scans', async (req, res) => {
+  const { api_key } = req.query;
+  if (!api_key) return res.status(400).json({ error: 'api_key required' });
 
+  try {
+    const scans = await pool.query(
+      `SELECT * FROM pending_scans WHERE api_key = $1 ORDER BY scanned_at DESC`,
+      [api_key]
+    );
 
-router.get('/queue', (req, res) => {
-  if (latestScan) {
-    const scan = latestScan;
-    latestScan = null; // Clear after one-time fetch
-    return res.json([scan]);
+    res.json(scans.rows);
+  } catch (err) {
+    console.error("❌ Error fetching pending scans:", err.message);
+    res.status(500).json({ error: "Failed to retrieve scans." });
   }
-  return res.json([]);
 });
 
+// 👇 Export this router
 module.exports = router;

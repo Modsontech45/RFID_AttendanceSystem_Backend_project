@@ -6,6 +6,7 @@ const cors = require('cors');
 const adminRoutes = require('./users-routes/admin');
 const teacherRoutes = require('./users-routes/teacher');
 const resetPasswordRoutes = require('./users-routes/reset-password')
+const deviceRoutes = require('./devices/registerdevice'); // adjust path as needed
 
 
 
@@ -36,7 +37,7 @@ app.use(cors({
 }));
 
 
-
+app.use('/api', deviceRoutes);
 
 app.use(bodyParser.json());
 app.use('/api/admins', adminRoutes);
