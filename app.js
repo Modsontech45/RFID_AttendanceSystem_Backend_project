@@ -37,7 +37,8 @@ app.use(cors({
 }));
 
 
-app.use('/api', deviceRoutes);
+app.use('/api/devices', deviceRoutes);
+
 
 app.use(bodyParser.json());
 app.use('/api/admins', adminRoutes);

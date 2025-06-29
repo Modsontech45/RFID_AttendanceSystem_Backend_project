@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db'); // PostgreSQL pool setup
+const pool = require('../db');
 
-// POST /devices/register
-router.post('/devices/register', async (req, res) => {
+// Register device
+router.post('/register', async (req, res) => {
   const { device_uid, device_name, api_key } = req.body;
-
   if (!device_uid || !device_name || !api_key) {
-    return res.status(400).json({ error: "Missing device_uid, device_name, or api_key." });
+    return res.status(400).json({ error: "Missing fields" });
   }
 
   try {
@@ -17,22 +16,33 @@ router.post('/devices/register', async (req, res) => {
     );
 
     if (existing.rows.length > 0) {
-      return res.status(200).json({ message: "Device already registered.", device: existing.rows[0] });
+      return res.status(200).json({ message: "Device already registered." });
     }
 
     const result = await pool.query(
-      `INSERT INTO devices (device_uid, device_name, api_key)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
+      `INSERT INTO devices (device_uid, device_name, api_key) VALUES ($1, $2, $3) RETURNING *`,
       [device_uid, device_name, api_key]
     );
 
     res.status(201).json({ message: "Device registered successfully.", device: result.rows[0] });
   } catch (err) {
-    console.error("Device registration error:", err);
-    res.status(500).json({ error: "Internal server error." });
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// 👇 Export the router so it can be used in app.js
+// Fetch all devices for the API key
+router.get('/', async (req, res) => {
+  const { api_key } = req.query;
+  if (!api_key) return res.status(400).json({ error: "API key required" });
+
+  try {
+    const result = await pool.query(`SELECT * FROM devices WHERE api_key = $1`, [api_key]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error fetching devices" });
+  }
+});
+
 module.exports = router;
