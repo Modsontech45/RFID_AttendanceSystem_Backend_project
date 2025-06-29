@@ -37,10 +37,12 @@ app.use(cors({
 }));
 
 
-app.use('/api/devices', deviceRoutes);
+
 
 
 app.use(bodyParser.json());
+
+app.use('/api/devices', deviceRoutes);
 app.use('/api/admins', adminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/teachers', teacherRoutes);
