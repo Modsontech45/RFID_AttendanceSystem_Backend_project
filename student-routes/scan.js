@@ -3,7 +3,7 @@ const pool = require('../db');
 const router = express.Router();
 
 // Store latest scans per device_uid
-let latestScans = {};
+const latestScans = {};
 
 // POST /api/scan
 router.post('/', async (req, res) => {
@@ -11,13 +11,17 @@ router.post('/', async (req, res) => {
   const now = new Date();
 
   if (!uid || !device_uid) {
+    console.warn(`[POST /api/scan] Missing uid or device_uid:`, req.body);
     return res.status(400).json({ message: 'uid and device_uid are required.', sign: 0 });
   }
 
   try {
+    console.log(`[POST /api/scan] Received scan from device_uid=${device_uid}, uid=${uid}`);
+
     const studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
 
     if (studentRes.rows.length === 0) {
+      console.log(`[POST /api/scan] UID not registered: ${uid}`);
       latestScans[device_uid] = {
         uid,
         device_uid,
@@ -42,6 +46,7 @@ router.post('/', async (req, res) => {
     const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
 
     if (parseInt(attendanceCheck.rows[0].count) === 0) {
+      console.log(`[POST /api/scan] Initializing attendance for date ${dateStr}`);
       const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
       for (const s of allStudents.rows) {
         await pool.query(
@@ -57,6 +62,7 @@ router.post('/', async (req, res) => {
     const isSignOutTime = hour >= 20 && hour < 22;
 
     if (!isSignInTime && !isSignOutTime) {
+      console.log(`[POST /api/scan] Scan outside allowed time for uid=${uid}, device_uid=${device_uid}`);
       latestScans[device_uid] = {
         uid,
         device_uid,
@@ -81,10 +87,12 @@ router.post('/', async (req, res) => {
     if (isSignInTime && !signed_in) {
       sign_in_time = now;
       signed_in = true;
+      console.log(`[POST /api/scan] User signed in: uid=${uid}, device_uid=${device_uid}`);
     }
 
     if (isSignOutTime && !signed_out) {
       if (!signed_in) {
+        console.log(`[POST /api/scan] Sign-out attempted before sign-in for uid=${uid}`);
         latestScans[device_uid] = {
           uid,
           device_uid,
@@ -99,6 +107,7 @@ router.post('/', async (req, res) => {
       }
       sign_out_time = now;
       signed_out = true;
+      console.log(`[POST /api/scan] User signed out: uid=${uid}, device_uid=${device_uid}`);
     }
 
     let status = 'absent';
@@ -130,12 +139,12 @@ router.post('/', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ Error processing scan:', err.message);
-    latestScans[device_uid] = {
-      uid,
-      device_uid,
+    console.error('❌ Error processing scan:', err);
+    latestScans[req.body.device_uid || 'unknown'] = {
+      uid: req.body.uid || null,
+      device_uid: req.body.device_uid || null,
       exists: false,
-      timestamp: now,
+      timestamp: new Date(),
       message: 'Error during scan processing',
       error: err.message,
       sign: 0,
@@ -148,14 +157,22 @@ router.post('/', async (req, res) => {
 // GET /api/scan/queue?device_uid=abc123
 router.get('/queue', (req, res) => {
   const { device_uid } = req.query;
-  if (!device_uid) return res.status(400).json({ error: 'device_uid is required' });
+
+  if (!device_uid) {
+    console.warn('[GET /api/scan/queue] Missing device_uid in query');
+    return res.status(400).json({ error: 'device_uid is required' });
+  }
+
+  console.log(`[GET /api/scan/queue] Polling scan for device_uid=${device_uid}`);
 
   const scan = latestScans[device_uid];
   if (scan) {
+    console.log(`[GET /api/scan/queue] Returning scan for device_uid=${device_uid}`, scan);
     delete latestScans[device_uid];
     return res.json([scan]);
   }
 
+  console.log(`[GET /api/scan/queue] No scan found for device_uid=${device_uid}`);
   return res.json([]);
 });
 
