@@ -48,4 +48,31 @@ router.get('/', async (req, res) => {
   }
 });
 
+
+// Delete a device by UID and API key
+router.delete('/:device_uid', async (req, res) => {
+  const { device_uid } = req.params;
+  const { api_key } = req.body;
+
+  if (!api_key || !device_uid) {
+    return res.status(400).json({ error: 'Missing device UID or API key' });
+  }
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM devices WHERE device_uid = $1 AND api_key = $2 RETURNING *',
+      [device_uid, api_key]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Device not found or unauthorized' });
+    }
+
+    res.json({ message: 'Device deleted successfully.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete device' });
+  }
+});
+
 module.exports = router;
