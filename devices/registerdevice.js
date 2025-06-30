@@ -75,4 +75,36 @@ router.delete('/:device_uid', async (req, res) => {
   }
 });
 
+router.post('/online', async (req, res) => {
+  const { device_uid, api_key } = req.body;
+
+  if (!device_uid || !api_key) {
+    return res.status(400).json({ error: 'Missing device_uid or api_key' });
+  }
+
+  try {
+    const result = await pool.query(`
+      UPDATE devices
+      SET last_seen = NOW()
+      WHERE device_uid = $1 AND api_key = $2
+      RETURNING last_seen
+    `, [device_uid, api_key]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Device not found or invalid API key' });
+    }
+
+    const lastSeen = result.rows[0].last_seen;
+
+    res.json({
+      message: 'Device marked as online',
+      last_seen: lastSeen
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update device status' });
+  }
+});
+
+
 module.exports = router;
