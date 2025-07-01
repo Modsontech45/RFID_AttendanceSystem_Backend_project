@@ -7,7 +7,7 @@ const adminRoutes = require('./users-routes/admin');
 const teacherRoutes = require('./users-routes/teacher');
 const resetPasswordRoutes = require('./users-routes/reset-password')
 const deviceRoutes = require('./devices/registerdevice'); // adjust path as needed
-const categoryRoutes = require('./category/categories'); // ✅ Adjust path as needed
+const categoryRoutes = require('./category/categories');
 
 
 
@@ -43,7 +43,8 @@ app.use(cors({
 
 
 app.use(bodyParser.json());
-app.use('/api/categories', categoryRoutes);
+
+app.use('/api/categories', categoryRoutes); // ✅ REGISTER the route here
 
 app.use('/api/devices', deviceRoutes);
 app.use('/api/admins', adminRoutes);
