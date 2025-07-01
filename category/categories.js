@@ -78,4 +78,37 @@ router.delete('/:id', verifyApiKey, async (req, res) => {
   }
 });
 
+router.patch("/:id", authenticateAdmin, async (req, res) => {
+  const categoryId = req.params.id;
+  const { name } = req.body;
+  const adminId = req.admin.id; // from middleware
+
+  if (!name) {
+    return res.status(400).json({ error: "Category name is required" });
+  }
+
+  try {
+    // Ensure the category belongs to the current admin
+    const existing = await pool.query(
+      "SELECT * FROM categories WHERE id = $1 AND admin_id = $2",
+      [categoryId, adminId]
+    );
+
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: "Category not found or unauthorized" });
+    }
+
+    // Update the category
+    await pool.query(
+      "UPDATE categories SET name = $1 WHERE id = $2 AND admin_id = $3",
+      [name, categoryId, adminId]
+    );
+
+    res.json({ message: "Category updated successfully" });
+  } catch (err) {
+    console.error("❌ Error updating category:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 module.exports = router;
