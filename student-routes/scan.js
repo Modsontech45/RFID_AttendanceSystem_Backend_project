@@ -58,8 +58,8 @@ router.post('/', async (req, res) => {
       console.log('✅ Attendance initialized for:', dateStr);
     }
 
-    const isSignInTime = hour >= 17 && hour < 19;
-    const isSignOutTime = hour >= 20 && hour < 22;
+    const isSignInTime = hour >= 0 && hour < 10;
+    const isSignOutTime = hour >= 11 && hour < 17;
 
     if (!isSignInTime && !isSignOutTime) {
       console.log(`[POST /api/scan] Scan outside allowed time for uid=${uid}, device_uid=${device_uid}`);
