@@ -1,20 +1,21 @@
-// routes/categories.js
 const express = require('express');
 const pool = require('../db');
 const router = express.Router();
+const getMessage = require('../utils/messages');
 const verifyApiKey = require('../middleware/verifyApiKey');
 
 // CREATE category
 router.post('/create', verifyApiKey, async (req, res) => {
+  const lang = req.headers['accept-language']?.split(',')[0] || 'en';
   const { name } = req.body;
   const { id: created_by, api_key, role } = req.user;
 
   if (role !== 'admin') {
-    return res.status(403).json({ error: 'Only admins can create categories.' });
+    return res.status(403).json({ error: getMessage(lang, 'onlyAdmins') });
   }
 
   if (!name) {
-    return res.status(400).json({ error: 'Category name is required.' });
+    return res.status(400).json({ error: getMessage(lang, 'categoryRequired') });
   }
 
   try {
@@ -22,19 +23,20 @@ router.post('/create', verifyApiKey, async (req, res) => {
       `INSERT INTO category (api_key, created_by, name) VALUES ($1, $2, $3) RETURNING *`,
       [api_key, created_by, name]
     );
-    res.status(201).json({ message: 'Category created', category: result.rows[0] });
+    res.status(201).json({ message: getMessage(lang, 'categoryCreated'), category: result.rows[0] });
   } catch (err) {
     console.error('Error creating category:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: getMessage(lang, 'internalError') });
   }
 });
 
 // GET all categories for the logged-in admin
 router.get('/', verifyApiKey, async (req, res) => {
+  const lang = req.headers['accept-language']?.split(',')[0] || 'en';
   const { api_key, role } = req.user;
 
   if (role !== 'admin') {
-    return res.status(403).json({ error: 'Only admins can fetch categories.' });
+    return res.status(403).json({ error: getMessage(lang, 'onlyAdmins') });
   }
 
   try {
@@ -45,69 +47,36 @@ router.get('/', verifyApiKey, async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching categories:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: getMessage(lang, 'internalError') });
   }
 });
 
 // DELETE category by ID
 router.delete('/:id', verifyApiKey, async (req, res) => {
+  const lang = req.headers['accept-language']?.split(',')[0] || 'en';
   const { id: adminId, api_key, role } = req.user;
   const categoryId = req.params.id;
 
   if (role !== 'admin') {
-    return res.status(403).json({ error: 'Only admins can delete categories.' });
+    return res.status(403).json({ error: getMessage(lang, 'onlyAdmins') });
   }
 
   try {
-    // Check if category exists and was created by this admin
     const check = await pool.query(
       `SELECT * FROM category WHERE id = $1 AND api_key = $2`,
       [categoryId, api_key]
     );
 
     if (check.rows.length === 0) {
-      return res.status(404).json({ error: 'Category not found or unauthorized.' });
+      return res.status(404).json({ error: getMessage(lang, 'notFoundOrUnauthorized') });
     }
 
     await pool.query(`DELETE FROM category WHERE id = $1`, [categoryId]);
 
-    res.json({ message: 'Category deleted successfully.' });
+    res.json({ message: getMessage(lang, 'deletedSuccess') });
   } catch (err) {
     console.error('Error deleting category:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-router.patch("/:id", authenticateAdmin, async (req, res) => {
-  const categoryId = req.params.id;
-  const { name } = req.body;
-  const adminId = req.admin.id; // from middleware
-
-  if (!name) {
-    return res.status(400).json({ error: "Category name is required" });
-  }
-
-  try {
-    // Ensure the category belongs to the current admin
-    const existing = await pool.query(
-      "SELECT * FROM categories WHERE id = $1 AND admin_id = $2",
-      [categoryId, adminId]
-    );
-
-    if (existing.rowCount === 0) {
-      return res.status(404).json({ error: "Category not found or unauthorized" });
-    }
-
-    // Update the category
-    await pool.query(
-      "UPDATE categories SET name = $1 WHERE id = $2 AND admin_id = $3",
-      [name, categoryId, adminId]
-    );
-
-    res.json({ message: "Category updated successfully" });
-  } catch (err) {
-    console.error("❌ Error updating category:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: getMessage(lang, 'internalError') });
   }
 });
 
