@@ -1,85 +1,83 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const pool = require('../db'); // PostgreSQL connection
+const pool = require('../db');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
-
+const getMessage = require('../utils/messages');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
-// Nodemailer transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'tandemodson41@gmail.com',
-    pass: 'akpfigxajjzpqmzi' // Use an app password, not your real password
-  }
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
 });
 
-const sendResetEmail = async (email, token) => {
- const resetLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/reset-password.html?token=${encodeURIComponent(token)}`;
-
+const sendResetEmail = async (email, token, lang) => {
+  const resetLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/reset-password.html?token=${encodeURIComponent(token)}`;
 
   const mailOptions = {
-    from: '"Synctuario Support" <tandemodson41@gmail.com>',
+    from: `"Synctuario Support" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: 'Password Reset Request',
+    subject: getMessage(lang, 'reset.subject'),
     html: `
-      <p>You requested a password reset.</p>
-      <p>Click <a href="${resetLink}">here</a> to reset your password.</p>
-      <p><strong>This link expires in 15 minutes.</strong></p>
-    `
+      <p>${getMessage(lang, 'reset.requested')}</p>
+      <p><a href="${resetLink}">${getMessage(lang, 'reset.clickHere')}</a></p>
+      <p><strong>${getMessage(lang, 'reset.expiry')}</strong></p>
+    `,
   };
 
   await transporter.sendMail(mailOptions);
 };
-// Request reset link
+
+// ✅ Request password reset
 router.post('/request-reset', async (req, res) => {
   const { email } = req.body;
+  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+
   try {
     const { rows } = await pool.query('SELECT * FROM admins WHERE email = $1', [email]);
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'No user found with that email' });
+      return res.status(404).json({ message: getMessage(lang, 'reset.notFound') });
     }
 
     const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: '15m' });
-    await sendResetEmail(email, token);
-    res.json({ message: 'Reset link sent to your email' });
+    await sendResetEmail(email, token, lang);
+    res.json({ message: getMessage(lang, 'reset.sent') });
   } catch (err) {
     console.error('Reset error:', err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: getMessage(lang, 'common.internalError') });
   }
 });
 
+// ✅ Perform password reset
 router.post('/reset-password/:token', async (req, res) => {
   const { token } = req.params;
   const { newPassword } = req.body;
+  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const email = decoded.email;
 
-    // Hash the new password before saving
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
-    // Update password in DB
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     const result = await pool.query(
       'UPDATE admins SET password = $1 WHERE email = $2',
       [hashedPassword, email]
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: getMessage(lang, 'reset.notFound') });
     }
 
-    res.json({ success: true, message: 'Password reset successful' });
+    res.json({ success: true, message: getMessage(lang, 'reset.success') });
   } catch (err) {
     console.error('Token error:', err);
-    res.status(400).json({ success: false, message: 'Invalid or expired token' });
+    res.status(400).json({ success: false, message: getMessage(lang, 'reset.invalidToken') });
   }
 });
-
 
 module.exports = router;

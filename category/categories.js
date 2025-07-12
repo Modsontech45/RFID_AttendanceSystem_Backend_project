@@ -11,11 +11,11 @@ router.post('/create', verifyApiKey, async (req, res) => {
   const { id: created_by, api_key, role } = req.user;
 
   if (role !== 'admin') {
-    return res.status(403).json({ error: getMessage(lang, 'onlyAdmins') });
+    return res.status(403).json({ error: getMessage(lang, 'category.onlyAdmins') });
   }
 
   if (!name) {
-    return res.status(400).json({ error: getMessage(lang, 'categoryRequired') });
+    return res.status(400).json({ error: getMessage(lang, 'category.categoryRequired') });
   }
 
   try {
@@ -23,10 +23,10 @@ router.post('/create', verifyApiKey, async (req, res) => {
       `INSERT INTO category (api_key, created_by, name) VALUES ($1, $2, $3) RETURNING *`,
       [api_key, created_by, name]
     );
-    res.status(201).json({ message: getMessage(lang, 'categoryCreated'), category: result.rows[0] });
+    res.status(201).json({ message: getMessage(lang, 'category.categoryCreated'), category: result.rows[0] });
   } catch (err) {
     console.error('Error creating category:', err);
-    res.status(500).json({ error: getMessage(lang, 'internalError') });
+    res.status(500).json({ error: getMessage(lang, 'category.internalError') });
   }
 });
 
@@ -36,7 +36,7 @@ router.get('/', verifyApiKey, async (req, res) => {
   const { api_key, role } = req.user;
 
   if (role !== 'admin') {
-    return res.status(403).json({ error: getMessage(lang, 'onlyAdmins') });
+    return res.status(403).json({ error: getMessage(lang, 'category.onlyAdmins') });
   }
 
   try {
@@ -47,7 +47,7 @@ router.get('/', verifyApiKey, async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching categories:', err);
-    res.status(500).json({ error: getMessage(lang, 'internalError') });
+    res.status(500).json({ error: getMessage(lang, 'category.internalError') });
   }
 });
 
@@ -58,7 +58,7 @@ router.delete('/:id', verifyApiKey, async (req, res) => {
   const categoryId = req.params.id;
 
   if (role !== 'admin') {
-    return res.status(403).json({ error: getMessage(lang, 'onlyAdmins') });
+    return res.status(403).json({ error: getMessage(lang, 'category.onlyAdmins') });
   }
 
   try {
@@ -68,15 +68,15 @@ router.delete('/:id', verifyApiKey, async (req, res) => {
     );
 
     if (check.rows.length === 0) {
-      return res.status(404).json({ error: getMessage(lang, 'notFoundOrUnauthorized') });
+      return res.status(404).json({ error: getMessage(lang, 'category.notFoundOrUnauthorized') });
     }
 
     await pool.query(`DELETE FROM category WHERE id = $1`, [categoryId]);
 
-    res.json({ message: getMessage(lang, 'deletedSuccess') });
+    res.json({ message: getMessage(lang, 'category.deletedSuccess') });
   } catch (err) {
     console.error('Error deleting category:', err);
-    res.status(500).json({ error: getMessage(lang, 'internalError') });
+    res.status(500).json({ error: getMessage(lang, 'category.internalError') });
   }
 });
 

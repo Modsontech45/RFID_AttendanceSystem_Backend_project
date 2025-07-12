@@ -1,16 +1,20 @@
 const pool = require("../db");
+const getMessage = require("../utils/messages");
 
 module.exports = async function verifyApiKey(req, res, next) {
+  const lang =
+    req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
+
   try {
     const apiKey =
-      (req.body && req.body.api_key) || // safe check req.body
+      (req.body && req.body.api_key) ||
       req.query.api_key ||
       req.headers["x-api-key"];
 
     console.log("🔑 Received API Key:", apiKey);
 
     if (!apiKey) {
-      return res.status(400).json({ message: "API key required" });
+      return res.status(400).json({ message: getMessage(lang, "api.required") });
     }
 
     // Check admins
@@ -35,10 +39,10 @@ module.exports = async function verifyApiKey(req, res, next) {
       return next();
     }
 
-    return res.status(403).json({ message: "Invalid API key" });
+    return res.status(403).json({ message: getMessage(lang, "api.invalid") });
 
   } catch (err) {
     console.error("❌ API Key validation failed:", err);
-    res.status(500).json({ message: "Server error validating API key" });
+    res.status(500).json({ message: getMessage(lang, "api.error") });
   }
 };

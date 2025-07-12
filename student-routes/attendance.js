@@ -1,31 +1,33 @@
 const express = require('express');
 const pool = require('../db');
 const router = express.Router();
-const verifyApiKey = require('../middleware/verifyApiKey'); // ✅ import
+const verifyApiKey = require('../middleware/verifyApiKey');
+const getMessage = require('../utils/messages');
 
 // GET attendance records filtered by API key
 router.get('/', verifyApiKey, async (req, res) => {
+  const lang = req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
+
   try {
     const requesterApiKey = req.user.api_key;
 
     if (!requesterApiKey) {
-      return res.status(403).json({ message: "No API key found" });
+      return res.status(403).json({ message: getMessage(lang, "attendance.noApiKey") });
     }
 
-    // Only return attendance records for students with matching api_key
     const attendances = await pool.query(
       `SELECT * FROM attendance WHERE api_key = $1`,
       [requesterApiKey]
     );
 
     if (attendances.rows.length === 0) {
-      return res.status(403).json({ message: "No attendance data for your API key" });
+      return res.status(403).json({ message: getMessage(lang, "attendance.noneForKey") });
     }
 
     res.json(attendances.rows);
   } catch (err) {
     console.error("Error fetching attendances:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: getMessage(lang, "attendance.serverError") });
   }
 });
 
