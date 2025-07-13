@@ -17,19 +17,18 @@ const port = 3000;
 
 
 
+
 const allowedOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:5500',
-  'http://localhost:5173', // ✅ Added correct local dev origin
-  'https://localhost:5173', // optional, only if using HTTPS locally
+   'http://localhost:5173',
   'https://rfid-attendance-synctuario-theta.vercel.app',
   'https://rfid-attendancesystem-backend-project.onrender.com'
 ];
 
-
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // Allow non-browser requests
+    if (!origin) return callback(null, true); // Allow non-browser requests like Postman
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -37,11 +36,13 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  credentials: true,
-}));
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // ✅ Handles OPTIONS preflight
 
 
-app.options('*', cors(corsOptions));// was not here
 
 
 app.use(bodyParser.json());
