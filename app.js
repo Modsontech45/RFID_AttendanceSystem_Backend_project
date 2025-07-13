@@ -17,14 +17,15 @@ const port = 3000;
 
 
 
-
 const allowedOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:5500',
-   'https://localhost:5173',
+  'http://localhost:5173', // ✅ Added correct local dev origin
+  'https://localhost:5173', // optional, only if using HTTPS locally
   'https://rfid-attendance-synctuario-theta.vercel.app',
   'https://rfid-attendancesystem-backend-project.onrender.com'
 ];
+
 
 app.use(cors({
   origin: function (origin, callback) {
