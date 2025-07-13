@@ -107,6 +107,9 @@ router.get('/verify/:token', async (req, res) => {
 // ✅ Admin Login
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
+    if (!req.body) {
+    return res.status(400).json({ error: true, message: 'Missing request body' });
+  }
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
 
   if (!email || !password) {
