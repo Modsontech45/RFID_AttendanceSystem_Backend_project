@@ -159,8 +159,8 @@ router.post('/login', async (req, res) => {
       token,
       admin: {
         id: admin.id,
-        firstname: admin.firstname,
-        lastname: admin.lastname,
+        schoolname: admin.schoolname,
+        username: admin.username,
         email: admin.email,
         role: admin.role,
         api_key: apiKey,
