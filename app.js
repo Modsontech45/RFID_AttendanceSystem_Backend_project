@@ -16,31 +16,35 @@ const app = express();
 const port = 3000;
 
 
-
-
 const allowedOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:5500',
-   'http://localhost:5173',
+  'http://localhost:5173',
   'https://rfid-attendance-synctuario-theta.vercel.app',
   'https://rfid-attendancesystem-backend-project.onrender.com'
 ];
 
+function isAllowedDevOrigin(origin) {
+  // Allow StackBlitz, WebContainer, GitHub Codespaces-like dynamic subdomains
+  const devPattern = /\.local-credentialless\.webcontainer-api\.io$/;
+  return devPattern.test(origin);
+}
+
 app.use(cors({
   origin: function (origin, callback) {
     console.log("🌐 Incoming Origin:", origin);
-    if (!origin) return callback(null, true); // Allow non-browser requests
-    if (allowedOrigins.includes(origin)) {
+
+    if (!origin) return callback(null, true); // Allow non-browser tools (like Postman, curl)
+
+    if (allowedOrigins.includes(origin) || isAllowedDevOrigin(origin)) {
       return callback(null, true);
-    } else {
-      console.error(`❌ CORS blocked: ${origin}`);
-      return callback(new Error('CORS not allowed for this origin'), false);
     }
+
+    return callback(new Error('CORS not allowed for this origin'), false);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true,
 }));
-
 
 
 
