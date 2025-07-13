@@ -22,6 +22,7 @@ const allowedOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:5500',
   'http://localhost:5173',
+    'https://bolt.new' ,
   'https://rfid-attendance-synctuario-theta.vercel.app',
   'https://rfid-attendancesystem-backend-project.onrender.com',
   'https://zp1v56uxy8rdx5ypatb0ockcb9tr6a-oci3--5173--96435430.local-credentialless.webcontainer-api.io' // ✅ ADD THIS
