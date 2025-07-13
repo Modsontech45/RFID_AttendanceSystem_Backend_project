@@ -5,17 +5,14 @@ const cors = require('cors');
 
 const adminRoutes = require('./users-routes/admin');
 const teacherRoutes = require('./users-routes/teacher');
-const resetPasswordRoutes = require('./users-routes/reset-password')
-const deviceRoutes = require('./devices/registerdevice'); // adjust path as needed
+const resetPasswordRoutes = require('./users-routes/reset-password');
+const deviceRoutes = require('./devices/registerdevice');
 const categoryRoutes = require('./category/categories');
-
-
-
 
 const app = express();
 const port = 3000;
 
-
+// Define CORS options
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
@@ -26,8 +23,7 @@ const corsOptions = {
       'https://rfid-attendance-synctuario-theta.vercel.app',
       'https://rfid-attendancesystem-backend-project.onrender.com'
     ];
-
-    if (!origin) return callback(null, true); // Allow non-browser requests (like Postman)
+    if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -35,25 +31,20 @@ const corsOptions = {
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  credentials: true
+  credentials: true,
 };
 
-
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // ✅ Preflight handler
-
+app.options('*', cors(corsOptions)); // 👈 handles preflight
 
 app.use(bodyParser.json());
 
-app.use('/api/categories', categoryRoutes); // ✅ REGISTER the route here
-
+app.use('/api/categories', categoryRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/admins', adminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/reset', resetPasswordRoutes);
-
-
 app.use('/api/students', require('./student-routes/students'));
 app.use('/api/attendance', require('./student-routes/attendance'));
 app.use('/api/scan', require('./student-routes/scan'));
