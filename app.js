@@ -21,6 +21,8 @@ const port = 3000;
 const allowedOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:5500',
+   'http://localhost:5173',
+    /\.webcontainer-api\.io$/,
   'https://rfid-attendance-synctuario-theta.vercel.app',
   'https://rfid-attendancesystem-backend-project.onrender.com'
 ];
