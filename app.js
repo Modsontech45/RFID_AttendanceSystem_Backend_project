@@ -37,11 +37,11 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  credentials: false,
+  credentials: true,
 }));
 
 
-
+app.options('*', cors(corsOptions));// was not here
 
 
 app.use(bodyParser.json());
