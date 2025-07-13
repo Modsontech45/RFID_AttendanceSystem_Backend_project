@@ -64,3 +64,64 @@ app.use('/api/register', require('./student-routes/register'));
 app.listen(port, () => {
   console.log(`✅ Server running at http://localhost:${port}`);
 });
+
+
+
+
+// ✅ Admin Signup
+router.post('/signup', async (req, res) => {
+  const { firstname, lastname, email, password } = req.body;
+  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+
+  if (!firstname || !lastname || !email || !password) {
+    return res.status(400).json({ message: getMessage(lang, 'admin.requiredFields') });
+  }
+
+  try {
+    const existing = await pool.query('SELECT * FROM admins WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ message: getMessage(lang, 'admin.alreadyExists') });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const apiKey = crypto.randomBytes(32).toString('hex');
+
+    const result = await pool.query(
+      `INSERT INTO admins (firstname, lastname, email, password, api_key, verified, verification_token)
+       VALUES ($1, $2, $3, $4, $5, false, $6) RETURNING *`,
+      [firstname, lastname, email, hashedPassword, apiKey, verificationToken]
+    );
+
+    const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/verify.html?token=${encodeURIComponent(verificationToken)}`;
+
+    const emailTemplate = `
+      <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+        <div style="background: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;">
+          <h2>Hello ${firstname},</h2>
+          <p>${getMessage(lang, 'admin.verifyInstruction')}</p>
+          <a href="${verifyLink}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+            ${getMessage(lang, 'admin.verifyEmail')}
+          </a>
+          <p style="margin-top: 20px;">${getMessage(lang, 'admin.ignoreEmail')}</p>
+        </div>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: '"Admin System" SYNCTUARIO',
+      to: email,
+      subject: getMessage(lang, 'admin.verifySubject'),
+      html: emailTemplate,
+    });
+
+    res.status(201).json({
+      message: getMessage(lang, 'admin.signupSuccess'),
+      redirect: '/pages/users/reset/email-sent.html',
+    });
+
+  } catch (err) {
+    console.error('❌ Signup error:', err.message);
+    res.status(500).json({ message: getMessage(lang, 'common.internalError'), error: err.message });
+  }
+});

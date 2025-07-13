@@ -24,35 +24,41 @@ if (!process.env.JWT_SECRET) {
 
 // ✅ Admin Signup
 router.post('/signup', async (req, res) => {
-  const { firstname, lastname, email, password } = req.body;
+  const { schoolname, username, email, password } = req.body;
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
 
-  if (!firstname || !lastname || !email || !password) {
+  // Validate required fields
+  if (!schoolname || !username || !email || !password) {
     return res.status(400).json({ message: getMessage(lang, 'admin.requiredFields') });
   }
 
   try {
+    // Check for existing email
     const existing = await pool.query('SELECT * FROM admins WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ message: getMessage(lang, 'admin.alreadyExists') });
     }
 
+    // Generate credentials
     const hashedPassword = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const apiKey = crypto.randomBytes(32).toString('hex');
 
+    // Insert new admin
     const result = await pool.query(
-      `INSERT INTO admins (firstname, lastname, email, password, api_key, verified, verification_token)
+      `INSERT INTO admins (schoolname, username, email, password, api_key, verified, verification_token)
        VALUES ($1, $2, $3, $4, $5, false, $6) RETURNING *`,
-      [firstname, lastname, email, hashedPassword, apiKey, verificationToken]
+      [schoolname, username, email, hashedPassword, apiKey, verificationToken]
     );
 
+    // Create verification link
     const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/verify.html?token=${encodeURIComponent(verificationToken)}`;
 
+    // Email template
     const emailTemplate = `
       <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
         <div style="background: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;">
-          <h2>Hello ${firstname},</h2>
+          <h2>Welcome to ${schoolname}, ${username}</h2>
           <p>${getMessage(lang, 'admin.verifyInstruction')}</p>
           <a href="${verifyLink}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
             ${getMessage(lang, 'admin.verifyEmail')}
@@ -62,6 +68,7 @@ router.post('/signup', async (req, res) => {
       </div>
     `;
 
+    // Send verification email
     await transporter.sendMail({
       from: '"Admin System" SYNCTUARIO',
       to: email,
@@ -69,6 +76,7 @@ router.post('/signup', async (req, res) => {
       html: emailTemplate,
     });
 
+    // Respond to client
     res.status(201).json({
       message: getMessage(lang, 'admin.signupSuccess'),
       redirect: '/pages/users/reset/email-sent.html',
@@ -79,6 +87,7 @@ router.post('/signup', async (req, res) => {
     res.status(500).json({ message: getMessage(lang, 'common.internalError'), error: err.message });
   }
 });
+
 
 // ✅ Email Verification
 router.get('/verify/:token', async (req, res) => {
