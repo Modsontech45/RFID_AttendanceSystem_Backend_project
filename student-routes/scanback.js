@@ -1,127 +1,186 @@
-require('dotenv').config();
 const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
+const pool = require('../db');
+const router = express.Router();
+const getMessage = require('../utils/messages');
 
-const adminRoutes = require('./users-routes/admin');
-const teacherRoutes = require('./users-routes/teacher');
-const resetPasswordRoutes = require('./users-routes/reset-password')
-const deviceRoutes = require('./devices/registerdevice'); // adjust path as needed
-const categoryRoutes = require('./category/categories');
+// Store latest scans per device_uid
+const latestScans = {};
 
-
-
-
-const app = express();
-const port = 3000;
-
-
-
-
-const allowedOrigins = [
-  'http://localhost:8080',
-  'http://127.0.0.1:5500',
-   'http://localhost:5173',
-  'https://rfid-attendance-synctuario-theta.vercel.app',
-  'https://rfid-attendancesystem-backend-project.onrender.com'
-];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // Allow non-browser requests like Postman
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS not allowed for this origin'), false);
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  credentials: true
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // ✅ Handles OPTIONS preflight
-
-
-
-
-app.use(bodyParser.json());
-
-app.use('/api/categories', categoryRoutes); // ✅ REGISTER the route here
-
-app.use('/api/devices', deviceRoutes);
-app.use('/api/admins', adminRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/teachers', teacherRoutes);
-app.use('/api/reset', resetPasswordRoutes);
-
-
-app.use('/api/students', require('./student-routes/students'));
-app.use('/api/attendance', require('./student-routes/attendance'));
-app.use('/api/scan', require('./student-routes/scan'));
-app.use('/api/register', require('./student-routes/register'));
-
-app.listen(port, () => {
-  console.log(`✅ Server running at http://localhost:${port}`);
-});
-
-
-
-
-// ✅ Admin Signup
-router.post('/signup', async (req, res) => {
-  const { firstname, lastname, email, password } = req.body;
+router.post('/', async (req, res) => {
+  const { uid, device_uid } = req.body;
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+  const now = new Date();
 
-  if (!firstname || !lastname || !email || !password) {
-    return res.status(400).json({ message: getMessage(lang, 'admin.requiredFields') });
+  if (!uid || !device_uid) {
+    return res.status(400).json({
+      message: getMessage(lang, 'scan.missingFields'),
+      sign: 0
+    });
   }
 
   try {
-    const existing = await pool.query('SELECT * FROM admins WHERE email = $1', [email]);
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ message: getMessage(lang, 'admin.alreadyExists') });
+    const studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
+
+    if (studentRes.rows.length === 0) {
+      latestScans[device_uid] = {
+        uid,
+        device_uid,
+        exists: false,
+        message: getMessage(lang, 'scan.uidNotRegistered'),
+        timestamp: now,
+        sign: 2,
+        flag: getMessage(lang, 'scan.registerNow')
+      };
+      return res.json({
+        message: getMessage(lang, 'scan.uidNotRegistered'),
+        flag: getMessage(lang, 'scan.registerNow'),
+        sign: 2
+      });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const apiKey = crypto.randomBytes(32).toString('hex');
+    const student = studentRes.rows[0];
+    const dateStr = now.toISOString().slice(0, 10);
+    const hour = now.getHours();
 
-    const result = await pool.query(
-      `INSERT INTO admins (firstname, lastname, email, password, api_key, verified, verification_token)
-       VALUES ($1, $2, $3, $4, $5, false, $6) RETURNING *`,
-      [firstname, lastname, email, hashedPassword, apiKey, verificationToken]
+    const attendanceCheck = await pool.query(
+      'SELECT COUNT(*) FROM attendance WHERE date = $1',
+      [dateStr]
     );
 
-    const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/verify.html?token=${encodeURIComponent(verificationToken)}`;
+    if (parseInt(attendanceCheck.rows[0].count) === 0) {
+      const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
+      for (const s of allStudents.rows) {
+        await pool.query(
+          `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key)
+           VALUES ($1, $2, $3, $4, false, false, 'absent', $5)`,
+          [s.uid, s.name, s.form, dateStr, s.api_key]
+        );
+      }
+    }
 
-    const emailTemplate = `
-      <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
-        <div style="background: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;">
-          <h2>Hello ${firstname},</h2>
-          <p>${getMessage(lang, 'admin.verifyInstruction')}</p>
-          <a href="${verifyLink}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-            ${getMessage(lang, 'admin.verifyEmail')}
-          </a>
-          <p style="margin-top: 20px;">${getMessage(lang, 'admin.ignoreEmail')}</p>
-        </div>
-      </div>
-    `;
+    const isSignInTime = hour >= 16 && hour < 17;
+    const isSignOutTime = hour >= 18 && hour < 24;
 
-    await transporter.sendMail({
-      from: '"Admin System" SYNCTUARIO',
-      to: email,
-      subject: getMessage(lang, 'admin.verifySubject'),
-      html: emailTemplate,
-    });
+    if (!isSignInTime && !isSignOutTime) {
+      latestScans[device_uid] = {
+        uid,
+        device_uid,
+        exists: true,
+        name: student.name,
+        timestamp: now,
+        message: getMessage(lang, 'scan.outsideTime'),
+        sign: 0,
+        flag: getMessage(lang, 'scan.outsideFlag')
+      };
+      return res.json({
+        message: getMessage(lang, 'scan.outsideTime'),
+        flag: getMessage(lang, 'scan.outsideFlag'),
+        sign: 0
+      });
+    }
 
-    res.status(201).json({
-      message: getMessage(lang, 'admin.signupSuccess'),
-      redirect: '/pages/users/reset/email-sent.html',
+    const attendanceRes = await pool.query(
+      'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
+      [uid, dateStr]
+    );
+
+    const existing = attendanceRes.rows[0];
+    let { sign_in_time, sign_out_time, signed_in, signed_out } = existing;
+
+    if (isSignInTime && !signed_in) {
+      sign_in_time = now;
+      signed_in = true;
+    }
+
+    if (isSignOutTime && !signed_out) {
+      if (!signed_in) {
+        latestScans[device_uid] = {
+          uid,
+          device_uid,
+          exists: true,
+          name: student.name,
+          timestamp: now,
+          message: getMessage(lang, 'scan.signInFirst'),
+          sign: 3,
+          flag: getMessage(lang, 'scan.signInFlag')
+        };
+        return res.json({
+          message: getMessage(lang, 'scan.signInFirst'),
+          flag: getMessage(lang, 'scan.signInFlag'),
+          sign: 3
+        });
+      }
+      sign_out_time = now;
+      signed_out = true;
+    }
+
+    let status = 'absent';
+    if (signed_in && signed_out) status = 'present';
+    else if (signed_in) status = 'partial';
+
+    await pool.query(
+      `UPDATE attendance
+       SET sign_in_time = $1, sign_out_time = $2, signed_in = $3, signed_out = $4, status = $5
+       WHERE id = $6`,
+      [sign_in_time, sign_out_time, signed_in, signed_out, status, existing.id]
+    );
+
+    const signedMessage = isSignInTime
+      ? getMessage(lang, 'scan.signedIn')
+      : getMessage(lang, 'scan.signedOut');
+
+    latestScans[device_uid] = {
+      uid,
+      device_uid,
+      exists: true,
+      name: student.name,
+      timestamp: now,
+      message: signedMessage,
+      sign: 1,
+      flag: signedMessage
+    };
+
+    return res.json({
+      message: signedMessage,
+      flag: signedMessage,
+      sign: 1
     });
 
   } catch (err) {
-    console.error('❌ Signup error:', err.message);
-    res.status(500).json({ message: getMessage(lang, 'common.internalError'), error: err.message });
+    console.error('❌ Error processing scan:', err);
+    latestScans[req.body.device_uid || 'unknown'] = {
+      uid: req.body.uid || null,
+      device_uid: req.body.device_uid || null,
+      exists: false,
+      timestamp: new Date(),
+      message: getMessage(lang, 'scan.error'),
+      error: err.message,
+      sign: 0,
+      flag: 'Error'
+    };
+    return res.status(500).json({
+      message: getMessage(lang, 'scan.failed'),
+      error: err.message,
+      sign: 0
+    });
   }
 });
+
+router.get('/queue', (req, res) => {
+  const { device_uid } = req.query;
+  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+
+  if (!device_uid) {
+    return res.status(400).json({ error: getMessage(lang, 'scan.deviceRequired') });
+  }
+
+  const scan = latestScans[device_uid];
+  if (scan) {
+    delete latestScans[device_uid];
+    return res.json([scan]);
+  }
+
+  return res.json([]);
+});
+
+module.exports = router;
