@@ -19,16 +19,30 @@ router.post('/create', verifyApiKey, async (req, res) => {
   }
 
   try {
+    // Step 1: Check for duplicate category for this API key
+    const existing = await pool.query(
+      `SELECT * FROM category WHERE LOWER(name) = LOWER($1) AND api_key = $2`,
+      [name.trim(), api_key]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: getMessage(lang, 'category.alreadyExists') || 'Category already exists' });
+    }
+
+    // Step 2: Insert new category
     const result = await pool.query(
       `INSERT INTO category (api_key, created_by, name) VALUES ($1, $2, $3) RETURNING *`,
-      [api_key, created_by, name]
+      [api_key, created_by, name.trim()]
     );
+
     res.status(201).json({ message: getMessage(lang, 'category.categoryCreated'), category: result.rows[0] });
+
   } catch (err) {
     console.error('Error creating category:', err);
     res.status(500).json({ error: getMessage(lang, 'category.internalError') });
   }
 });
+
 
 // GET all categories for the logged-in admin
 router.get('/', verifyApiKey, async (req, res) => {
