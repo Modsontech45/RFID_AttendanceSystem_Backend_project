@@ -59,7 +59,7 @@ router.post('/', async (req, res) => {
     }
 
     const isSignInTime = hour >= 16 && hour < 17;
-    const isSignOutTime = hour >= 11 && hour < 17;
+    const isSignOutTime = hour >= 18 && hour < 24;
 
     if (!isSignInTime && !isSignOutTime) {
       latestScans[device_uid] = {
