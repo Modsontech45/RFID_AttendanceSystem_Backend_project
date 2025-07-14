@@ -58,7 +58,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    const isSignInTime = hour >= 0 && hour < 10;
+    const isSignInTime = hour >= 16 && hour < 17;
     const isSignOutTime = hour >= 11 && hour < 17;
 
     if (!isSignInTime && !isSignOutTime) {
