@@ -37,10 +37,12 @@ router.post('/create', verifyApiKey, async (req, res) => {
 
     res.status(201).json({ message: getMessage(lang, 'category.categoryCreated'), category: result.rows[0] });
 
-  } catch (err) {
-    console.error('Error creating category:', err);
-    res.status(500).json({ error: getMessage(lang, 'category.internalError') });
-  }
+  }catch (err) {
+  console.error('❌ Error creating category:', err); // log full error
+  res.status(500).json({
+    error: err?.message || getMessage(lang, 'category.internalError') || 'Internal server error'
+  });
+}
 });
 
 
