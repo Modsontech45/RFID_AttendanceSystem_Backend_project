@@ -52,7 +52,8 @@ router.post('/signup', async (req, res) => {
     );
 
     // Create verification link
-    const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/verify.html?token=${encodeURIComponent(verificationToken)}`;
+const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/admin/verify?token=${encodeURIComponent(verificationToken)}`;
+
 
     // Email template
     const emailTemplate = `
@@ -79,7 +80,7 @@ router.post('/signup', async (req, res) => {
     // Respond to client
     res.status(201).json({
       message: getMessage(lang, 'admin.signupSuccess'),
-      redirect: '/pages/users/reset/email-sent.html',
+      redirect: 'https://rfid-attendance-synctuario-theta.vercel.app/admin/email-sent',
     });
 
   } catch (err) {

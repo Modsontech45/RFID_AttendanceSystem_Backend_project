@@ -17,7 +17,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendResetEmail = async (email, token, lang) => {
-  const resetLink = `https://rfid-attendance-synctuario-theta.vercel.app/pages/users/reset/reset-password.html?token=${encodeURIComponent(token)}`;
+  const resetLink = `https://rfid-attendance-synctuario-theta.vercel.app/admin/reset-password?token=${encodeURIComponent(token)}`;
 
   const mailOptions = {
     from: `"Synctuario Support" <${process.env.EMAIL_USER}>`,
