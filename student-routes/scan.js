@@ -143,7 +143,7 @@ router.post('/', async (req, res) => {
       [sign_in_time, sign_out_time, signed_in, signed_out, status, existing.id]
     );
 
-    const message = isSignInTime ? 'signed in.' : 'signed out.';
+    const message = isSignInTime ? 'signed in' : 'signed out .';
 
     const scanSuccess = {
       uid,
