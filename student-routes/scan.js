@@ -1,19 +1,17 @@
 const express = require('express');
 const pool = require('../db');
 const router = express.Router();
-const getMessage = require('../utils/messages');
 
 const latestScans = {};
 
 // POST /scan
 router.post('/', async (req, res) => {
   const { uid, device_uid } = req.body;
-  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
   const now = new Date();
 
   if (!uid || !device_uid) {
     return res.status(400).json({
-      message: getMessage(lang, 'scan.missingFields'),
+      message: 'UID and device UID are required.',
       sign: 0
     });
   }
@@ -21,16 +19,15 @@ router.post('/', async (req, res) => {
   try {
     // 1. Check if student exists
     const studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
-
     if (studentRes.rows.length === 0) {
       const notFound = {
         uid,
         device_uid,
         exists: false,
-        message: getMessage(lang, 'scan.uidNotRegistered'),
+        message: 'UID not registered.',
         timestamp: now,
         sign: 2,
-        flag: getMessage(lang, 'scan.registerNow')
+        flag: 'Please register this student.'
       };
       latestScans[device_uid] = notFound;
       return res.json(notFound);
@@ -65,7 +62,7 @@ router.post('/', async (req, res) => {
 
     if (timeSettingsRes.rows.length === 0) {
       return res.status(400).json({
-        message: getMessage(lang, 'timeSettings.notFound'),
+        message: 'Time settings not found.',
         sign: 0
       });
     }
@@ -77,8 +74,8 @@ router.post('/', async (req, res) => {
       sign_out_end
     } = timeSettingsRes.rows[0];
 
-    // 4. Compare current time with sign-in/out windows
-    const nowStr = now.toTimeString().split(" ")[0]; // "HH:MM:SS"
+    // 4. Check current time
+    const nowStr = now.toTimeString().split(" ")[0];
     const isBetween = (start, end, current) => current >= start && current <= end;
 
     const isSignInTime = isBetween(sign_in_start, sign_in_end, nowStr);
@@ -91,9 +88,9 @@ router.post('/', async (req, res) => {
         exists: true,
         name: student.name,
         timestamp: now,
-        message: getMessage(lang, 'scan.outsideTime'),
+        message: 'Scan is outside allowed time window.',
         sign: 0,
-        flag: getMessage(lang, 'scan.outsideFlag')
+        flag: 'Try again during sign-in or sign-out time.'
       };
       latestScans[device_uid] = outsideTime;
       return res.json(outsideTime);
@@ -123,9 +120,9 @@ router.post('/', async (req, res) => {
           exists: true,
           name: student.name,
           timestamp: now,
-          message: getMessage(lang, 'scan.signInFirst'),
+          message: 'You must sign in before signing out.',
           sign: 3,
-          flag: getMessage(lang, 'scan.signInFlag')
+          flag: 'Sign in first.'
         };
         latestScans[device_uid] = mustSignInFirst;
         return res.json(mustSignInFirst);
@@ -134,7 +131,7 @@ router.post('/', async (req, res) => {
       signed_out = true;
     }
 
-    // 8. Determine final status
+    // 8. Final status
     let status = 'absent';
     if (signed_in && signed_out) status = 'present';
     else if (signed_in) status = 'partial';
@@ -146,9 +143,7 @@ router.post('/', async (req, res) => {
       [sign_in_time, sign_out_time, signed_in, signed_out, status, existing.id]
     );
 
-    const signedMessage = isSignInTime
-      ? getMessage(lang, 'scan.signedIn')
-      : getMessage(lang, 'scan.signedOut');
+    const message = isSignInTime ? 'Successfully signed in.' : 'Successfully signed out.';
 
     const scanSuccess = {
       uid,
@@ -156,9 +151,9 @@ router.post('/', async (req, res) => {
       exists: true,
       name: student.name,
       timestamp: now,
-      message: signedMessage,
+      message,
       sign: 1,
-      flag: signedMessage
+      flag: message
     };
 
     latestScans[device_uid] = scanSuccess;
@@ -171,28 +166,23 @@ router.post('/', async (req, res) => {
       device_uid: req.body.device_uid || null,
       exists: false,
       timestamp: new Date(),
-      message: getMessage(lang, 'scan.error'),
+      message: 'Scan failed.',
       error: err.message,
       sign: 0,
       flag: 'Error'
     };
     latestScans[device_uid || 'unknown'] = errorResponse;
-    return res.status(500).json({
-      message: getMessage(lang, 'scan.failed'),
-      error: err.message,
-      sign: 0
-    });
+    return res.status(500).json(errorResponse);
   }
 });
 
 // GET /scan/queue
 router.get('/queue', (req, res) => {
   const { device_uid } = req.query;
-  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
 
   if (!device_uid) {
     return res.status(400).json({
-      error: getMessage(lang, 'scan.deviceRequired')
+      error: 'Device UID is required.'
     });
   }
 
