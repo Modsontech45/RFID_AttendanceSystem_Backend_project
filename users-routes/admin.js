@@ -117,7 +117,6 @@ router.get('/verify/:token', async (req, res) => {
 
 // ✅ Admin Login
 
-
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
@@ -161,7 +160,7 @@ router.post('/login', async (req, res) => {
 
     try {
       const geo = await axios.get(`https://ipapi.co/${ip}/json/`);
-      locationText = `${geo.data.city}, ${geo.data.region}, ${geo.data.country_name}`;
+      locationText = `${geo.data.city || 'Unknown'}, ${geo.data.region || ''}, ${geo.data.country_name || ''}`;
     } catch (geoErr) {
       console.warn('🌍 Failed to fetch geolocation:', geoErr.message);
     }
@@ -204,5 +203,6 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ message: getMessage(lang, 'common.internalError'), error: err.message });
   }
 });
+
 
 module.exports = router;
