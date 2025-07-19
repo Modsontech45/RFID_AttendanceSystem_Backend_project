@@ -1,17 +1,17 @@
-const express = require('express');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const pool = require('../db');
-const nodemailer = require('nodemailer');
-const crypto = require('crypto');
-const getMessage = require('../utils/messages');
-const axios = require('axios');
-require('dotenv').config();
+const express = require("express");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const pool = require("../db");
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
+const getMessage = require("../utils/messages");
+const axios = require("axios");
+require("dotenv").config();
 
 const router = express.Router();
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -24,26 +24,33 @@ if (!process.env.JWT_SECRET) {
 }
 
 // ✅ Admin Signup
-router.post('/signup', async (req, res) => {
+router.post("/signup", async (req, res) => {
   const { schoolname, username, email, password } = req.body;
-  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+  const lang =
+    req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
 
   // Validate required fields
   if (!schoolname || !username || !email || !password) {
-    return res.status(400).json({ message: getMessage(lang, 'admin.requiredFields') });
+    return res
+      .status(400)
+      .json({ message: getMessage(lang, "admin.requiredFields") });
   }
 
   try {
     // Check for existing email
-    const existing = await pool.query('SELECT * FROM admins WHERE email = $1', [email]);
+    const existing = await pool.query("SELECT * FROM admins WHERE email = $1", [
+      email,
+    ]);
     if (existing.rows.length > 0) {
-      return res.status(409).json({ message: getMessage(lang, 'admin.alreadyExists') });
+      return res
+        .status(409)
+        .json({ message: getMessage(lang, "admin.alreadyExists") });
     }
 
     // Generate credentials
     const hashedPassword = await bcrypt.hash(password, 10);
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const apiKey = crypto.randomBytes(32).toString('hex');
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const apiKey = crypto.randomBytes(32).toString("hex");
 
     // Insert new admin
     const result = await pool.query(
@@ -53,19 +60,23 @@ router.post('/signup', async (req, res) => {
     );
 
     // Create verification link
-const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/admin/verify?token=${encodeURIComponent(verificationToken)}`;
-
+    const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/admin/verify?token=${encodeURIComponent(
+      verificationToken
+    )}`;
 
     // Email template
     const emailTemplate = `
       <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
         <div style="background: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;">
           <h2>Welcome to ${schoolname}, ${username}</h2>
-          <p>${getMessage(lang, 'admin.verifyInstruction')}</p>
+          <p>${getMessage(lang, "admin.verifyInstruction")}</p>
           <a href="${verifyLink}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-            ${getMessage(lang, 'admin.verifyEmail')}
+            ${getMessage(lang, "admin.verifyEmail")}
           </a>
-          <p style="margin-top: 20px;">${getMessage(lang, 'admin.ignoreEmail')}</p>
+          <p style="margin-top: 20px;">${getMessage(
+            lang,
+            "admin.ignoreEmail"
+          )}</p>
         </div>
       </div>
     `;
@@ -74,27 +85,32 @@ const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/admin/ve
     await transporter.sendMail({
       from: '"Admin System" SYNCTUARIO',
       to: email,
-      subject: getMessage(lang, 'admin.verifySubject'),
+      subject: getMessage(lang, "admin.verifySubject"),
       html: emailTemplate,
     });
 
     // Respond to client
     res.status(201).json({
-      message: getMessage(lang, 'admin.signupSuccess'),
-      redirect: 'https://rfid-attendance-synctuario-theta.vercel.app/admin/email-sent',
+      message: getMessage(lang, "admin.signupSuccess"),
+      redirect:
+        "https://rfid-attendance-synctuario-theta.vercel.app/admin/email-sent",
     });
-
   } catch (err) {
-    console.error('❌ Signup error:', err.message);
-    res.status(500).json({ message: getMessage(lang, 'common.internalError'), error: err.message });
+    console.error("❌ Signup error:", err.message);
+    res
+      .status(500)
+      .json({
+        message: getMessage(lang, "common.internalError"),
+        error: err.message,
+      });
   }
 });
 
-
 // ✅ Email Verification
-router.get('/verify/:token', async (req, res) => {
+router.get("/verify/:token", async (req, res) => {
   const { token } = req.params;
-  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+  const lang =
+    req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
 
   try {
     const result = await pool.query(
@@ -104,66 +120,90 @@ router.get('/verify/:token', async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      return res.status(400).json({ message: getMessage(lang, 'admin.invalidToken') });
+      return res
+        .status(400)
+        .json({ message: getMessage(lang, "admin.invalidToken") });
     }
 
-    res.json({ message: getMessage(lang, 'admin.verifiedSuccess') });
-
+    res.json({ message: getMessage(lang, "admin.verifiedSuccess") });
   } catch (err) {
-    console.error('❌ Verification error:', err.message);
-    res.status(500).json({ message: getMessage(lang, 'common.internalError'), error: err.message });
+    console.error("❌ Verification error:", err.message);
+    res
+      .status(500)
+      .json({
+        message: getMessage(lang, "common.internalError"),
+        error: err.message,
+      });
   }
 });
 
 // ✅ Admin Login
 
-router.post('/login', async (req, res) => {
+router.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+  const lang =
+    req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
 
   if (!email || !password) {
-    return res.status(400).json({ message: getMessage(lang, 'admin.emailPasswordRequired') });
+    return res
+      .status(400)
+      .json({ message: getMessage(lang, "admin.emailPasswordRequired") });
   }
 
   try {
-    const result = await pool.query('SELECT * FROM admins WHERE email = $1', [email]);
+    const result = await pool.query("SELECT * FROM admins WHERE email = $1", [
+      email,
+    ]);
     const admin = result.rows[0];
 
     if (!admin) {
-      return res.status(401).json({ message: getMessage(lang, 'admin.invalidCredentials') });
+      return res
+        .status(401)
+        .json({ message: getMessage(lang, "admin.invalidCredentials") });
     }
 
     if (!admin.verified) {
-      return res.status(403).json({ message: getMessage(lang, 'admin.notVerified') });
+      return res
+        .status(403)
+        .json({ message: getMessage(lang, "admin.notVerified") });
     }
 
     const match = await bcrypt.compare(password, admin.password);
     if (!match) {
-      return res.status(401).json({ message: getMessage(lang, 'admin.invalidCredentials') });
+      return res
+        .status(401)
+        .json({ message: getMessage(lang, "admin.invalidCredentials") });
     }
 
     let apiKey = admin.api_key;
     if (!apiKey) {
-      apiKey = crypto.randomBytes(32).toString('hex');
-      await pool.query('UPDATE admins SET api_key = $1 WHERE id = $2', [apiKey, admin.id]);
+      apiKey = crypto.randomBytes(32).toString("hex");
+      await pool.query("UPDATE admins SET api_key = $1 WHERE id = $2", [
+        apiKey,
+        admin.id,
+      ]);
     }
 
     const token = jwt.sign(
       { id: admin.id, role: admin.role },
       process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: "1d" }
     );
 
     // 🔍 Get IP and location
-    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'Unknown';
-    let locationText = 'Unknown location';
+    const ip =
+      req.headers["x-forwarded-for"]?.split(",")[0] ||
+      req.socket?.remoteAddress ||
+      "Unknown";
+    let locationText = "Unknown location";
 
     try {
-     
-      const geo = await axios.get(`https://ipapi.co/${ip}/json/`);
-      locationText = `${geo.city || 'Unknown'}, ${geo.region || ''}, ${geo.country_name || ''}`;
+      const { data } = await axios.get(`https://ipapi.co/${ip}/json/`);
+      locationText = `${data.city || "Unknown"}, ${data.region || ""}, ${
+        data.country_name || ""
+      }`;
     } catch (geoErr) {
-      console.warn('🌍 Failed to fetch geolocation:', geoErr.message);
+      console.warn("🌍 Failed to fetch geolocation:", geoErr.message);
     }
 
     // 📧 Send login alert email
@@ -178,15 +218,15 @@ router.post('/login', async (req, res) => {
     `;
 
     await transporter.sendMail({
-      from: '"Login Alert" <' + process.env.EMAIL_USER + '>',
+      from: '"Login Alert" <' + process.env.EMAIL_USER + ">",
       to: admin.email,
-      subject: 'Login Alert - Admin Panel',
+      subject: "Login Alert - Admin Panel",
       html: loginEmail,
     });
 
     // ✅ Respond
     res.status(200).json({
-      message: getMessage(lang, 'admin.loginSuccess'),
+      message: getMessage(lang, "admin.loginSuccess"),
       token,
       admin: {
         id: admin.id,
@@ -198,12 +238,15 @@ router.post('/login', async (req, res) => {
         created_at: admin.created_at,
       },
     });
-
   } catch (err) {
     console.error("❌ Error during admin login:", err.message);
-    res.status(500).json({ message: getMessage(lang, 'common.internalError'), error: err.message });
+    res
+      .status(500)
+      .json({
+        message: getMessage(lang, "common.internalError"),
+        error: err.message,
+      });
   }
 });
-
 
 module.exports = router;
