@@ -97,10 +97,12 @@ router.post("/signup", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Signup error:", err.message);
-    res.status(500).json({
-      message: getMessage(lang, "common.internalError"),
-      error: err.message,
-    });
+    res
+      .status(500)
+      .json({
+        message: getMessage(lang, "common.internalError"),
+        error: err.message,
+      });
   }
 });
 
@@ -126,10 +128,12 @@ router.get("/verify/:token", async (req, res) => {
     res.json({ message: getMessage(lang, "admin.verifiedSuccess") });
   } catch (err) {
     console.error("❌ Verification error:", err.message);
-    res.status(500).json({
-      message: getMessage(lang, "common.internalError"),
-      error: err.message,
-    });
+    res
+      .status(500)
+      .json({
+        message: getMessage(lang, "common.internalError"),
+        error: err.message,
+      });
   }
 });
 
@@ -194,10 +198,10 @@ router.post("/login", async (req, res) => {
     let locationText = "Unknown location";
 
     try {
-      const { data } = await axios.get(`https://ipapi.co/${ip}/json/`);
-      const parts = [data.city, data.region, data.country_name].filter(Boolean);
-      const locationText =
-        parts.length > 0 ? parts.join(", ") : "Unknown location";
+    const { data } = await axios.get(`https://ipapi.co/${ip}/json/`);
+const parts = [data.city, data.region, data.country_name].filter(Boolean);
+const locationText = parts.length > 0 ? parts.join(', ') : 'Unknown location';
+
     } catch (geoErr) {
       console.warn("🌍 Failed to fetch geolocation:", geoErr.message);
     }
@@ -236,10 +240,12 @@ router.post("/login", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error during admin login:", err.message);
-    res.status(500).json({
-      message: getMessage(lang, "common.internalError"),
-      error: err.message,
-    });
+    res
+      .status(500)
+      .json({
+        message: getMessage(lang, "common.internalError"),
+        error: err.message,
+      });
   }
 });
 
