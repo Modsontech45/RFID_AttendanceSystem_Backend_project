@@ -5,6 +5,7 @@ const pool = require('../db');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const getMessage = require('../utils/messages');
+const axios = require('axios');
 require('dotenv').config();
 
 const router = express.Router();
@@ -115,11 +116,10 @@ router.get('/verify/:token', async (req, res) => {
 });
 
 // ✅ Admin Login
+
+
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-    if (!req.body) {
-    return res.status(400).json({ error: true, message: 'Missing request body' });
-  }
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
 
   if (!email || !password) {
@@ -155,6 +155,36 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1d' }
     );
 
+    // 🔍 Get IP and location
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'Unknown';
+    let locationText = 'Unknown location';
+
+    try {
+      const geo = await axios.get(`https://ipapi.co/${ip}/json/`);
+      locationText = `${geo.data.city}, ${geo.data.region}, ${geo.data.country_name}`;
+    } catch (geoErr) {
+      console.warn('🌍 Failed to fetch geolocation:', geoErr.message);
+    }
+
+    // 📧 Send login alert email
+    const loginEmail = `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>Hello ${admin.username},</h2>
+        <p>You just logged into your admin account.</p>
+        <p><strong>Location:</strong> ${locationText}</p>
+        <p><strong>IP Address:</strong> ${ip}</p>
+        <p>If this wasn’t you, please change your password immediately.</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: '"Login Alert" <' + process.env.EMAIL_USER + '>',
+      to: admin.email,
+      subject: 'Login Alert - Admin Panel',
+      html: loginEmail,
+    });
+
+    // ✅ Respond
     res.status(200).json({
       message: getMessage(lang, 'admin.loginSuccess'),
       token,

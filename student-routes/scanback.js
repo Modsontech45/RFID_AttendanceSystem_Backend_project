@@ -206,3 +206,66 @@ router.get('/queue', (req, res) => {
 });
 
 module.exports = router;
+
+
+
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+    if (!req.body) {
+    return res.status(400).json({ error: true, message: 'Missing request body' });
+  }
+  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+
+  if (!email || !password) {
+    return res.status(400).json({ message: getMessage(lang, 'admin.emailPasswordRequired') });
+  }
+
+  try {
+    const result = await pool.query('SELECT * FROM admins WHERE email = $1', [email]);
+    const admin = result.rows[0];
+
+    if (!admin) {
+      return res.status(401).json({ message: getMessage(lang, 'admin.invalidCredentials') });
+    }
+
+    if (!admin.verified) {
+      return res.status(403).json({ message: getMessage(lang, 'admin.notVerified') });
+    }
+
+    const match = await bcrypt.compare(password, admin.password);
+    if (!match) {
+      return res.status(401).json({ message: getMessage(lang, 'admin.invalidCredentials') });
+    }
+
+    let apiKey = admin.api_key;
+    if (!apiKey) {
+      apiKey = crypto.randomBytes(32).toString('hex');
+      await pool.query('UPDATE admins SET api_key = $1 WHERE id = $2', [apiKey, admin.id]);
+    }
+
+    const token = jwt.sign(
+      { id: admin.id, role: admin.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.status(200).json({
+      message: getMessage(lang, 'admin.loginSuccess'),
+      token,
+      admin: {
+        id: admin.id,
+        schoolname: admin.schoolname,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role,
+        api_key: apiKey,
+        created_at: admin.created_at,
+      },
+    });
+
+  } catch (err) {
+    console.error("❌ Error during admin login:", err.message);
+    res.status(500).json({ message: getMessage(lang, 'common.internalError'), error: err.message });
+  }
+});
+
