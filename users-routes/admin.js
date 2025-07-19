@@ -198,9 +198,9 @@ router.post("/login", async (req, res) => {
     let locationText = "Unknown location";
 
     try {
-    const { data } = await axios.get(`https://ipapi.co/${ip}/json/`);
-const parts = [data.city, data.region, data.country_name].filter(Boolean);
-const locationText = parts.length > 0 ? parts.join(', ') : 'Unknown location';
+  const { data } = await axios.get(`https://ipapi.co/${ip}/json/`);
+  const parts = [data.city, data.region, data.country_name].filter(Boolean);
+  locationText = parts.length > 0 ? parts.join(', ') : 'Unknown location';
 
     } catch (geoErr) {
       console.warn("🌍 Failed to fetch geolocation:", geoErr.message);
