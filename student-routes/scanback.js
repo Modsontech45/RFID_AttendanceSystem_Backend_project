@@ -270,9 +270,9 @@ router.post('/login', async (req, res) => {
 });
 
 const plans = {
-  starter: "PLN_x6kb1kh4122bm3q",
-  professional: "PLN_td9knl16tw6lp1l",
-  enterprise: "PLN_ebucle4ojvpl5hk",
+  Starter: "PLN_x6kb1kh4122bm3q",
+  Professional: "PLN_td9knl16tw6lp1l",
+  Enterprise: "PLN_ebucle4ojvpl5hk",
 };
 
 // const plans = {

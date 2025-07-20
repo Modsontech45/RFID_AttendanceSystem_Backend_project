@@ -25,7 +25,7 @@ router.post("/paystack/initialize", async (req, res) => {
       "https://api.paystack.co/transaction/initialize",
       {
         email,
-        plan: plans[plan],   // send Paystack subscription plan code here
+        plan: plans[plan],        // ONLY the plan code here, NO amount
         currency: "GHS",
         callback_url: "https://yourfrontend.com/payment/callback",
       },
