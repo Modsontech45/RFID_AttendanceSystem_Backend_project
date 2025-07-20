@@ -8,9 +8,9 @@ const pool = require("../db"); // Adjust this path to your database config
 const router = express.Router();
 
 const plans = {
-  Starter: "PLN_x6kb1kh4122bm3q",
-  Professional: "PLN_td9knl16tw6lp1l",
-  Enterprise: "PLN_ebucle4ojvpl5hk",
+  starter: "PLN_x6kb1kh4122bm3q",
+  professional: "PLN_td9knl16tw6lp1l",
+  enterprise: "PLN_ebucle4ojvpl5hk",
 };
 
 router.post("/paystack/initialize", async (req, res) => {
