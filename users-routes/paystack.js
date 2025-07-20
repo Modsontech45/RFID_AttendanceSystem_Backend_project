@@ -1,3 +1,6 @@
+
+require("dotenv").config();
+
 const express = require("express");
 const axios = require("axios");
 const pool = require("../db"); // Adjust this path to your database config
@@ -18,12 +21,14 @@ router.post("/paystack/initialize", async (req, res) => {
     return res.status(400).json({ message: "Invalid plan" });
   }
 
+  console.log("Initializing Paystack for:", email, plan);
+
   try {
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email,
-        plan: plans[plan],
+        plan: plans[plan], // Do NOT include amount when using plan
         callback_url: "https://yourdomain.com/paystack/callback",
       },
       {
@@ -39,10 +44,12 @@ router.post("/paystack/initialize", async (req, res) => {
       authorization_url: response.data.data.authorization_url,
     });
   } catch (error) {
-    console.error("Paystack Init Error:", error.response?.data || error.message);
-    res.status(500).json({ message: "Paystack initialization failed" });
+    const errData = error.response?.data || error.message;
+    console.error("Paystack Init Error:", errData);
+    res.status(500).json({ message: "Paystack initialization failed", error: errData });
   }
 });
+
 
 // Verify transaction
 router.get("/paystack/verify/:reference", async (req, res) => {
