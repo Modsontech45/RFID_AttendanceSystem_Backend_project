@@ -59,7 +59,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/reset', resetPasswordRoutes);
 app.use('/api', timeSettingsRouter);
-app.use('/api/payment', paymentRoutes);
+app.use('/api/', paymentRoutes);
 
 
 app.use('/api/students', require('./student-routes/students'));

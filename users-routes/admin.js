@@ -138,6 +138,12 @@ router.get("/verify/:token", async (req, res) => {
 });
 
 // ✅ Admin Login
+const subStatus = await checkSubscription(admin);
+if (subStatus === "expired") {
+  return res.status(403).json({ message: "Subscription expired. Please renew." });
+}
+
+
 
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
