@@ -9,6 +9,7 @@ const resetPasswordRoutes = require('./users-routes/reset-password')
 const deviceRoutes = require('./devices/registerdevice'); // adjust path as needed
 const categoryRoutes = require('./category/categories');
 const timeSettingsRouter = require('./student-routes/timeSettings');
+const paymentRoutes = require('./users-routes/paystack');
 
 
 
@@ -58,6 +59,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/reset', resetPasswordRoutes);
 app.use('/api', timeSettingsRouter);
+app.use('/api/payment', paymentRoutes);
 
 
 app.use('/api/students', require('./student-routes/students'));
