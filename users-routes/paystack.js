@@ -21,13 +21,19 @@ router.post("/paystack/initialize", async (req, res) => {
   }
 
   try {
+    // Option 1: For subscription-based payments
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email,
-        plan: plans[plan],        // ONLY the plan code here, NO amount
+        plan: plans[plan],
         currency: "GHS",
         callback_url: "https://yourfrontend.com/payment/callback",
+        // Add these additional fields
+        channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
+        metadata: {
+          plan_name: plan
+        }
       },
       {
         headers: {
@@ -40,14 +46,17 @@ router.post("/paystack/initialize", async (req, res) => {
     res.status(200).json({
       message: "Payment initiated",
       authorization_url: response.data.data.authorization_url,
+      reference: response.data.data.reference
     });
   } catch (error) {
     const errData = error.response?.data || error.message;
     console.error("Paystack Init Error:", errData);
-    res.status(500).json({ message: "Paystack initialization failed", error: errData });
+    res.status(500).json({ 
+      message: "Paystack initialization failed", 
+      error: errData 
+    });
   }
 });
-
 
 // Verify transaction
 router.get("/paystack/verify/:reference", async (req, res) => {
