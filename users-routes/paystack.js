@@ -13,12 +13,6 @@ const plans = {
   enterprise: "PLN_ebucle4ojvpl5hk",
 };
 
-// const plans = {
-//   starter: "300",       // These look like amounts, NOT Paystack plan codes
-//   professional: "222",
-//   enterprise: "600",
-// };
-
 router.post("/paystack/initialize", async (req, res) => {
   const { email, plan } = req.body;
 
@@ -26,24 +20,14 @@ router.post("/paystack/initialize", async (req, res) => {
     return res.status(400).json({ message: "Invalid plan" });
   }
 
-  // If you want to use Paystack subscription plans, plans[plan] must be plan codes like "PLN_xxx"
-  // But here they are amounts (strings), so you CANNOT send them as `plan: plans[plan]`
-
-  // Convert amount string to number of pesewas (smallest unit)
-  const amountInPesewas = Number(plans[plan]) * 100;
-
-  if (isNaN(amountInPesewas) || amountInPesewas <= 0) {
-    return res.status(400).json({ message: "Invalid amount for the selected plan" });
-  }
-
   try {
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email,
-        amount: amountInPesewas,  // send amount (number in pesewas) here
+        plan: plans[plan],   // send Paystack subscription plan code here
         currency: "GHS",
-        callback_url: "https://yourdomain.com/paystack/callback",
+        callback_url: "https://yourfrontend.com/payment/callback",
       },
       {
         headers: {

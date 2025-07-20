@@ -269,3 +269,60 @@ router.post('/login', async (req, res) => {
   }
 });
 
+const plans = {
+  starter: "PLN_x6kb1kh4122bm3q",
+  professional: "PLN_td9knl16tw6lp1l",
+  enterprise: "PLN_ebucle4ojvpl5hk",
+};
+
+// const plans = {
+//   starter: "300",       // These look like amounts, NOT Paystack plan codes
+//   professional: "222",
+//   enterprise: "600",
+// };
+
+router.post("/paystack/initialize", async (req, res) => {
+  const { email, plan } = req.body;
+
+  if (!plans[plan]) {
+    return res.status(400).json({ message: "Invalid plan" });
+  }
+
+  // If you want to use Paystack subscription plans, plans[plan] must be plan codes like "PLN_xxx"
+  // But here they are amounts (strings), so you CANNOT send them as `plan: plans[plan]`
+
+  // Convert amount string to number of pesewas (smallest unit)
+  const amountInPesewas = Number(plans[plan]) * 100;
+
+  if (isNaN(amountInPesewas) || amountInPesewas <= 0) {
+    return res.status(400).json({ message: "Invalid amount for the selected plan" });
+  }
+
+  try {
+    const response = await axios.post(
+      "https://api.paystack.co/transaction/initialize",
+      {
+        email,
+        amount: amountInPesewas,  // send amount (number in pesewas) here
+        currency: "GHS",
+        callback_url: "https://yourdomain.com/paystack/callback",
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    res.status(200).json({
+      message: "Payment initiated",
+      authorization_url: response.data.data.authorization_url,
+    });
+  } catch (error) {
+    const errData = error.response?.data || error.message;
+    console.error("Paystack Init Error:", errData);
+    res.status(500).json({ message: "Paystack initialization failed", error: errData });
+  }
+});
+
