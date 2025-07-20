@@ -8,9 +8,18 @@ const pool = require("../db"); // Adjust this path to your database config
 const router = express.Router();
 
 const plans = {
-  starter: "PLN_x6kb1kh4122bm3q",
-  professional: "PLN_td9knl16tw6lp1l",
-  enterprise: "PLN_ebucle4ojvpl5hk",
+  Starter: {
+    code: "PLN_x6kb1kh4122bm3q",
+    amount: 3000 // $30 in kobo (GHS 30.00 * 100)
+  },
+  Professional: {
+    code: "PLN_td9knl16tw6lp1l", 
+    amount: 6000 // $60 in kobo (GHS 60.00 * 100)
+  },
+  Enterprise: {
+    code: "PLN_ebucle4ojvpl5hk",
+    amount: 10000 // Custom amount in kobo
+  }
 };
 
 router.post("/paystack/initialize", async (req, res) => {
@@ -21,15 +30,14 @@ router.post("/paystack/initialize", async (req, res) => {
   }
 
   try {
-    // Option 1: For subscription-based payments
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email,
-        plan: plans[plan],
+        amount: plans[plan].amount, // Add the amount in kobo
         currency: "GHS",
+        plan: plans[plan].code,     // Use the plan code
         callback_url: "https://yourfrontend.com/payment/callback",
-        // Add these additional fields
         channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
         metadata: {
           plan_name: plan
