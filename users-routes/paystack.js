@@ -8,12 +8,11 @@ const pool = require("../db"); // Adjust this path to your database config
 const router = express.Router();
 
 const plans = {
-  starter: "PLN_x6kb1kh4122bm3q",       // Replace with your actual Paystack plan codes
+  starter: "PLN_x6kb1kh4122bm3q",
   professional: "PLN_td9knl16tw6lp1l",
   enterprise: "PLN_ebucle4ojvpl5hk",
 };
 
-// Initialize payment
 router.post("/paystack/initialize", async (req, res) => {
   const { email, plan } = req.body;
 
@@ -21,14 +20,13 @@ router.post("/paystack/initialize", async (req, res) => {
     return res.status(400).json({ message: "Invalid plan" });
   }
 
-  console.log("Initializing Paystack for:", email, plan);
-
   try {
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email,
-        plan: plans[plan], // Do NOT include amount when using plan
+        plan: plans[plan], // Send Paystack Plan Code
+        currency: "GHS",
         callback_url: "https://yourdomain.com/paystack/callback",
       },
       {
@@ -49,6 +47,7 @@ router.post("/paystack/initialize", async (req, res) => {
     res.status(500).json({ message: "Paystack initialization failed", error: errData });
   }
 });
+
 
 
 // Verify transaction
