@@ -8,15 +8,15 @@ const pool = require("../db"); // Adjust this path to your database config
 const router = express.Router();
 
 const plans = {
-  Starter: {
+  starter: {
     code: "PLN_x6kb1kh4122bm3q",
     amount: 3000 // $30 in kobo (GHS 30.00 * 100)
   },
-  Professional: {
+  professional: {
     code: "PLN_td9knl16tw6lp1l", 
     amount: 6000 // $60 in kobo (GHS 60.00 * 100)
   },
-  Enterprise: {
+  enterprise: {
     code: "PLN_ebucle4ojvpl5hk",
     amount: 10000 // Custom amount in kobo
   }
