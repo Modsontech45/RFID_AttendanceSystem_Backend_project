@@ -61,9 +61,13 @@ router.post("/paystack/initialize", async (req, res) => {
   }
 });
 
-// 🔁 Verify Payment
-router.get("/paystack/verify/:reference", async (req, res) => {
-  const { reference } = req.params;
+// Use query param instead of route param
+router.get("/paystack/verify", async (req, res) => {
+  const { reference } = req.query;
+
+  if (!reference) {
+    return res.status(400).json({ message: "Missing reference in query" });
+  }
 
   try {
     const response = await axios.get(
@@ -115,5 +119,6 @@ router.get("/paystack/verify/:reference", async (req, res) => {
     });
   }
 });
+
 
 module.exports = router;
