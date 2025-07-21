@@ -19,7 +19,7 @@ router.get('/', verifyApiKey, async (req, res) => {
     if (subStatus === "expired") {
       return res.status(403).json({ 
         message: "Subscription expired. Please renew.",
-        redirectTo: "/pricing",
+        redirectTo: "https://rfid-attendance-synctuario-theta.vercel.app/pricing",
         subscriptionExpired: true
       });
     }
