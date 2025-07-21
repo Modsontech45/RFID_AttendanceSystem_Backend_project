@@ -61,15 +61,13 @@ router.post("/paystack/initialize", async (req, res) => {
   }
 });
 
-router.get("/paystack/verify", async (req, res) => {
-  const { reference } = req.query;
-
-  if (!reference) {
-    return res.status(400).json({ message: "Missing reference in query" });
-  }
+// 🔁 Verify Payment
+router.get("/paystack/verify/:reference", async (req, res) => {
+  const { reference } = req.params;
+  console.log(`[Verify] Received verification request for reference: ${reference}`);
 
   try {
-    // Call Paystack to verify transaction by reference
+    console.log(`[Verify] Sending request to Paystack for transaction verification...`);
     const response = await axios.get(
       `https://api.paystack.co/transaction/verify/${reference}`,
       {
@@ -79,20 +77,34 @@ router.get("/paystack/verify", async (req, res) => {
       }
     );
 
+    console.log(`[Verify] Received response from Paystack:`, response.data);
+
     const data = response.data.data;
 
+    if (!data) {
+      console.warn(`[Verify] No data found in Paystack response.`);
+      return res.status(500).json({ message: "No data from Paystack" });
+    }
+
+    console.log(`[Verify] Transaction status: ${data.status}`);
+
     if (data.status === "success") {
-      const email = data.customer.email;
+      const email = data.customer?.email;
       const planName =
         data.plan?.name?.toLowerCase() ||
         data.metadata?.plan_name?.toLowerCase() ||
         "unknown";
 
+      console.log(`[Verify] Successful payment for email: ${email}, plan: ${planName}`);
+
       const startDate = new Date();
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1);
 
-      // Update user subscription in DB
+      console.log(
+        `[Verify] Updating subscription in DB for ${email}: plan=${planName}, start=${startDate}, end=${endDate}`
+      );
+
       await pool.query(
         `UPDATE admins 
          SET subscription_plan = $1,
@@ -103,27 +115,24 @@ router.get("/paystack/verify", async (req, res) => {
         [planName, startDate, endDate, email]
       );
 
-      // Redirect on success
+      console.log(`[Verify] Database updated successfully for ${email}. Redirecting to success page.`);
       return res.redirect(
         "https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentsuccess"
       );
     } else {
-      // Redirect on failure
+      console.log(`[Verify] Payment status not successful. Redirecting to failure page.`);
       return res.redirect(
         "https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentfailed"
       );
     }
   } catch (error) {
     const errData = error?.response?.data || error.message;
-    console.error("Paystack verification failed:", errData);
-
-    // Return JSON error (or you could redirect to failure page)
+    console.error("[Verify] Paystack verification failed:", errData);
     return res.status(500).json({
       message: "Verification failed",
       error: errData,
     });
   }
 });
-
 
 module.exports = router;
