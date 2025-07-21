@@ -141,11 +141,6 @@ router.get("/verify/:token", async (req, res) => {
   }
 });
 
-
-
-
-
-
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   const lang =
@@ -182,25 +177,6 @@ router.post("/login", async (req, res) => {
         .json({ message: getMessage(lang, "admin.invalidCredentials") });
     }
 
-    // // 🔔 Check subscription status
-    // const subStatus = await checkSubscription(admin);
-    // if (subStatus === "expired") {
-    //   return res.status(403).json({ 
-    //     message: "Subscription expired. Please renew.",
-    //     redirectTo: "/subscription",
-    //     subscriptionExpired: true
-    //   });
-    // }
-    
-    // // If no subscription at all, redirect to subscription page
-    // if (subStatus === "none" || subStatus === "inactive") {
-    //   return res.status(403).json({ 
-    //     message: "Please subscribe to access the admin panel.",
-    //     redirectTo: "/subscription",
-    //     needsSubscription: true
-    //   });
-    // }
-
     let apiKey = admin.api_key;
     if (!apiKey) {
       apiKey = crypto.randomBytes(32).toString("hex");
@@ -226,7 +202,7 @@ router.post("/login", async (req, res) => {
     try {
       const { data } = await axios.get(`https://ipapi.co/${ip}/json/`);
       const parts = [data.city, data.region, data.country_name].filter(Boolean);
-      locationText = parts.length > 0 ? parts.join(', ') : 'Unknown location';
+      locationText = parts.length > 0 ? parts.join(", ") : "Unknown location";
     } catch (geoErr) {
       console.warn("🌍 Failed to fetch geolocation:", geoErr.message);
     }
@@ -249,11 +225,9 @@ router.post("/login", async (req, res) => {
       html: loginEmail,
     });
 
-    // ✅ Respond with subscription status included
     res.status(200).json({
       message: getMessage(lang, "admin.loginSuccess"),
       token,
-      // subscriptionStatus: subStatus,
       admin: {
         id: admin.id,
         schoolname: admin.schoolname,
@@ -266,13 +240,12 @@ router.post("/login", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error during admin login:", err.message);
-    res
-      .status(500)
-      .json({
-        message: getMessage(lang, "common.internalError"),
-        error: err.message,
-      });
+    res.status(500).json({
+      message: getMessage(lang, "common.internalError"),
+      error: err.message,
+    });
   }
 });
+
 
 module.exports = router;
