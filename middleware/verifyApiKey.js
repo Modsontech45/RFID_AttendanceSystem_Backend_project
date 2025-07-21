@@ -30,7 +30,7 @@ module.exports = async function verifyApiKey(req, res, next) {
 
     // Check teachers
     const teacherCheck = await pool.query(
-      "SELECT id, email, api_key FROM teachers WHERE api_key = $1",
+      "SELECT id, email, api_key, subscription_status, trial_end_date, subscription_end_date FROM teachers WHERE api_key = $1",
       [apiKey]
     );
 
