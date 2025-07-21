@@ -1,79 +1,18 @@
-
 require("dotenv").config();
 
 const express = require("express");
 const axios = require("axios");
-const pool = require("../db"); // Adjust this path to your database config
+const pool = require("../db");
 
 const router = express.Router();
 
-// const plans = {
-//     enterprise: {
-//       code: "PLN_x6kb1kh4122bm3q",
-//       amount: 10000 // Custom amount in kobo
-//     },
-//     professional: {
-//       code: "PLN_td9knl16tw6lp1l", 
-//       amount: 6000 // $60 in kobo (GHS 60.00 * 100)
-//     },
-//   starter: {
-   
-//      code: "PLN_ebucle4ojvpl5hk",
-//     amount: 3000 // $30 in kobo (GHS 30.00 * 100)
-//   }
-// };
-
-// router.post("/paystack/initialize", async (req, res) => {
-//   const { email, plan } = req.body;
-
-//   if (!plans[plan]) {
-//     return res.status(400).json({ message: "Invalid plan" });
-//   }
-
-//   try {
-//     const response = await axios.post(
-//       "https://api.paystack.co/transaction/initialize",
-//       {
-//         email,
-//         amount: plans[plan].amount, // Add the amount in kobo
-//         currency: "GHS",
-//         plan: plans[plan].code,     // Use the plan code
-//         callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment",
-//         channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
-//         metadata: {
-//           plan_name: plan
-//         }
-//       },
-//       {
-//         headers: {
-//           Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-//           "Content-Type": "application/json",
-//         },
-//       }
-//     );
-
-//     res.status(200).json({
-//       message: "Payment initiated",
-//       authorization_url: response.data.data.authorization_url,
-//       reference: response.data.data.reference
-//     });
-//   } catch (error) {
-//     const errData = error.response?.data || error.message;
-//     console.error("Paystack Init Error:", errData);
-//     res.status(500).json({ 
-//       message: "Paystack initialization failed", 
-//       error: errData 
-//     });
-//   }
-// });
-
-
 const plans = {
-  starter: "300",       // These look like amounts, NOT Paystack plan codes
+  starter: "300",
   professional: "222",
   enterprise: "600",
 };
 
+// 🔁 Initialize Payment
 router.post("/paystack/initialize", async (req, res) => {
   const { email, plan } = req.body;
 
@@ -81,10 +20,6 @@ router.post("/paystack/initialize", async (req, res) => {
     return res.status(400).json({ message: "Invalid plan" });
   }
 
-  // If you want to use Paystack subscription plans, plans[plan] must be plan codes like "PLN_xxx"
-  // But here they are amounts (strings), so you CANNOT send them as `plan: plans[plan]`
-
-  // Convert amount string to number of pesewas (smallest unit)
   const amountInPesewas = Number(plans[plan]) * 100;
 
   if (isNaN(amountInPesewas) || amountInPesewas <= 0) {
@@ -96,9 +31,12 @@ router.post("/paystack/initialize", async (req, res) => {
       "https://api.paystack.co/transaction/initialize",
       {
         email,
-        amount: amountInPesewas,  // send amount (number in pesewas) here
+        amount: amountInPesewas,
         currency: "GHS",
-        callback_url: `https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment/${response.data.data.reference}`,
+        callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment",
+        metadata: {
+          plan_name: plan,
+        },
       },
       {
         headers: {
@@ -108,19 +46,22 @@ router.post("/paystack/initialize", async (req, res) => {
       }
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Payment initiated",
       authorization_url: response.data.data.authorization_url,
+      reference: response.data.data.reference,
     });
   } catch (error) {
-    const errData = error.response?.data || error.message;
+    const errData = error?.response?.data || error.message;
     console.error("Paystack Init Error:", errData);
-    res.status(500).json({ message: "Paystack initialization failed", error: errData });
+    return res.status(500).json({
+      message: "Paystack initialization failed",
+      error: errData,
+    });
   }
 });
 
-
-
+// 🔁 Verify Payment
 router.get("/paystack/verify/:reference", async (req, res) => {
   const { reference } = req.params;
 
@@ -138,9 +79,10 @@ router.get("/paystack/verify/:reference", async (req, res) => {
 
     if (data.status === "success") {
       const email = data.customer.email;
-
       const planName =
-        data.plan?.name?.toLowerCase() || data.metadata?.plan_name?.toLowerCase() || "unknown";
+        data.plan?.name?.toLowerCase() ||
+        data.metadata?.plan_name?.toLowerCase() ||
+        "unknown";
 
       const startDate = new Date();
       const endDate = new Date();
@@ -156,15 +98,22 @@ router.get("/paystack/verify/:reference", async (req, res) => {
         [planName, startDate, endDate, email]
       );
 
-      return res.redirect("https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentsuccess");
+      return res.redirect(
+        "https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentsuccess"
+      );
     } else {
-      return res.redirect("https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentfailed");
+      return res.redirect(
+        "https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentfailed"
+      );
     }
-  } catch (err) {
-    console.error("Paystack verification failed:", err.message);
-    return res.status(500).json({ message: "Verification failed" });
+  } catch (error) {
+    const errData = error?.response?.data || error.message;
+    console.error("Paystack verification failed:", errData);
+    return res.status(500).json({
+      message: "Verification failed",
+      error: errData,
+    });
   }
 });
-
 
 module.exports = router;

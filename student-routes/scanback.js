@@ -321,3 +321,66 @@ router.post("/paystack/initialize", async (req, res) => {
   }
 });
 
+
+
+// const plans = {
+//     enterprise: {
+//       code: "PLN_x6kb1kh4122bm3q",
+//       amount: 10000 // Custom amount in kobo
+//     },
+//     professional: {
+//       code: "PLN_td9knl16tw6lp1l", 
+//       amount: 6000 // $60 in kobo (GHS 60.00 * 100)
+//     },
+//   starter: {
+   
+//      code: "PLN_ebucle4ojvpl5hk",
+//     amount: 3000 // $30 in kobo (GHS 30.00 * 100)
+//   }
+// };
+
+// router.post("/paystack/initialize", async (req, res) => {
+//   const { email, plan } = req.body;
+
+//   if (!plans[plan]) {
+//     return res.status(400).json({ message: "Invalid plan" });
+//   }
+
+//   try {
+//     const response = await axios.post(
+//       "https://api.paystack.co/transaction/initialize",
+//       {
+//         email,
+//         amount: plans[plan].amount, // Add the amount in kobo
+//         currency: "GHS",
+//         plan: plans[plan].code,     // Use the plan code
+//         callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment",
+//         channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
+//         metadata: {
+//           plan_name: plan
+//         }
+//       },
+//       {
+//         headers: {
+//           Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
+
+//     res.status(200).json({
+//       message: "Payment initiated",
+//       authorization_url: response.data.data.authorization_url,
+//       reference: response.data.data.reference
+//     });
+//   } catch (error) {
+//     const errData = error.response?.data || error.message;
+//     console.error("Paystack Init Error:", errData);
+//     res.status(500).json({ 
+//       message: "Paystack initialization failed", 
+//       error: errData 
+//     });
+//   }
+// });
+
+
