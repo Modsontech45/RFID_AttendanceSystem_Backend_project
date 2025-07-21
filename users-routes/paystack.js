@@ -58,7 +58,7 @@ router.post("/paystack/initialize", async (req, res) => {
         amount: plans[plan].amount, // Add the amount in kobo
         currency: "GHS",
         plan: plans[plan].code,     // Use the plan code
-        callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment/:reference",
+        callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment",
         channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
         metadata: {
           plan_name: plan
