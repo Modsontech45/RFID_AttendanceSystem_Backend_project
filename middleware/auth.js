@@ -2,6 +2,9 @@ const jwt = require('jsonwebtoken');
 const getMessage = require('../utils/messages');
 require('dotenv').config();
 
+/**
+ * Middleware to authenticate admin users
+ */
 const authenticateAdmin = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const lang = req.headers['accept-language'] || 'en';
@@ -17,8 +20,6 @@ const authenticateAdmin = (req, res, next) => {
       return res.status(403).json({ message: getMessage(lang, 'auth.invalidToken') });
     }
 
-    console.log('Admin decoded token:', decoded);
-
     if (decoded.role !== 'admin') {
       console.log('Access denied: role is not admin:', decoded.role);
       return res.status(403).json({ message: getMessage(lang, 'auth.accessDenied') });
@@ -29,6 +30,9 @@ const authenticateAdmin = (req, res, next) => {
   });
 };
 
+/**
+ * Middleware to authenticate teacher users
+ */
 const authenticateTeacher = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const lang = req.headers['accept-language'] || 'en';
@@ -44,10 +48,8 @@ const authenticateTeacher = (req, res, next) => {
       return res.status(403).json({ message: getMessage(lang, 'auth.invalidToken') });
     }
 
-    console.log('Teacher decoded token:', decoded);
-
     if (!decoded || decoded.role !== 'teacher') {
-      console.log('Access denied: role is not teacher:', decoded ? decoded.role : decoded);
+      console.log('Access denied: role is not teacher:', decoded ? decoded.role : 'undefined');
       return res.status(403).json({ message: getMessage(lang, 'auth.accessDenied') });
     }
 
@@ -56,15 +58,18 @@ const authenticateTeacher = (req, res, next) => {
   });
 };
 
+/**
+ * Checks if the admin's subscription is active, trial, or expired
+ */
 async function checkSubscription(admin) {
   const now = new Date();
   console.log("🕒 Current time:", now);
   console.log("🧾 Admin subscription status:", admin.subscription_status);
 
+  const subscriptionEnd = new Date("2025-07-20");
+
   if (admin.subscription_status === "trial") {
-    const trialEnd = new Date("2025-07-20");
-    console.log("⏳ Trial ends at:", trialEnd);
-    if (now > trialEnd) {
+    if (now > subscriptionEnd) {
       console.log("🚫 Trial expired");
       return "expired";
     }
@@ -73,9 +78,7 @@ async function checkSubscription(admin) {
   }
 
   if (admin.subscription_status === "active") {
-    const endDate = new Date("2025-07-20");
-    console.log("📆 Subscription ends at:", endDate);
-    if (now > endDate) {
+    if (now > subscriptionEnd) {
       console.log("🚫 Subscription expired");
       return "expired";
     }
@@ -83,16 +86,12 @@ async function checkSubscription(admin) {
     return "active";
   }
 
-  console.log("❓ No subscription found");
+  console.log("❓ No valid subscription found");
   return "none";
 }
-
-
-
 
 module.exports = {
   authenticateAdmin,
   authenticateTeacher,
   checkSubscription,
-  
 };
