@@ -25,21 +25,35 @@ if (!process.env.JWT_SECRET) {
 
 async function checkSubscription(admin) {
   const now = new Date();
+  console.log("🕒 Current time:", now);
+  console.log("🧾 Admin subscription status:", admin.subscription_status);
 
   if (admin.subscription_status === "trial") {
-    const trialEnd  = new Date("2025-07-20");  //new Date(admin.trial_end_date);
-    if (now > trialEnd) return "expired";
+    const trialEnd = new Date("2025-07-20");
+    console.log("⏳ Trial ends at:", trialEnd);
+    if (now > trialEnd) {
+      console.log("🚫 Trial expired");
+      return "expired";
+    }
+    console.log("✅ Trial active");
     return "trial";
   }
 
   if (admin.subscription_status === "active") {
-    const endDate =   new Date("2025-08-20");  //new Date(admin.subscription_end_date);
-    if (now > endDate) return "expired";
+    const endDate = new Date("2025-08-20");
+    console.log("📆 Subscription ends at:", endDate);
+    if (now > endDate) {
+      console.log("🚫 Subscription expired");
+      return "expired";
+    }
+    console.log("✅ Subscription active");
     return "active";
   }
 
+  console.log("❓ No subscription found");
   return "none";
 }
+
 
 // ✅ Admin Signup
 router.post("/signup", async (req, res) => {
