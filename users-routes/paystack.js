@@ -61,7 +61,6 @@ router.post("/paystack/initialize", async (req, res) => {
   }
 });
 
-// Use query param instead of route param
 router.get("/paystack/verify", async (req, res) => {
   const { reference } = req.query;
 
@@ -70,6 +69,7 @@ router.get("/paystack/verify", async (req, res) => {
   }
 
   try {
+    // Call Paystack to verify transaction by reference
     const response = await axios.get(
       `https://api.paystack.co/transaction/verify/${reference}`,
       {
@@ -92,6 +92,7 @@ router.get("/paystack/verify", async (req, res) => {
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1);
 
+      // Update user subscription in DB
       await pool.query(
         `UPDATE admins 
          SET subscription_plan = $1,
@@ -102,10 +103,12 @@ router.get("/paystack/verify", async (req, res) => {
         [planName, startDate, endDate, email]
       );
 
+      // Redirect on success
       return res.redirect(
         "https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentsuccess"
       );
     } else {
+      // Redirect on failure
       return res.redirect(
         "https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentfailed"
       );
@@ -113,6 +116,8 @@ router.get("/paystack/verify", async (req, res) => {
   } catch (error) {
     const errData = error?.response?.data || error.message;
     console.error("Paystack verification failed:", errData);
+
+    // Return JSON error (or you could redirect to failure page)
     return res.status(500).json({
       message: "Verification failed",
       error: errData,
