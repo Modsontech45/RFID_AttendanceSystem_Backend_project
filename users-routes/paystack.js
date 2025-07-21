@@ -61,50 +61,65 @@ router.post("/paystack/initialize", async (req, res) => {
   }
 });
 
-// 🔁 Verify Payment
 router.get("/paystack/verify/:reference", async (req, res) => {
   const { reference } = req.params;
-  console.log(`[Verify] Received verification request for reference: ${reference}`);
+  console.log(`[Verify] Starting verification for reference: ${reference}`);
 
-  try {
-    console.log(`[Verify] Sending request to Paystack for transaction verification...`);
-    const response = await axios.get(
-      `https://api.paystack.co/transaction/verify/${reference}`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-        },
-      }
-    );
+  if (!reference) {
+    console.log("[Verify] Missing reference param");
+    return res.status(400).json({ message: "Missing reference parameter" });
+  }
 
-    console.log(`[Verify] Received response from Paystack:`, response.data);
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+    },
+    timeout: 10000, // 10 seconds timeout
+  };
 
-    const data = response.data.data;
+  let response;
+  let attempt = 0;
+  const maxRetries = 2;
 
-    if (!data) {
-      console.warn(`[Verify] No data found in Paystack response.`);
-      return res.status(500).json({ message: "No data from Paystack" });
-    }
-
-    console.log(`[Verify] Transaction status: ${data.status}`);
-
-    if (data.status === "success") {
-      const email = data.customer?.email;
-      const planName =
-        data.plan?.name?.toLowerCase() ||
-        data.metadata?.plan_name?.toLowerCase() ||
-        "unknown";
-
-      console.log(`[Verify] Successful payment for email: ${email}, plan: ${planName}`);
-
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 1);
-
-      console.log(
-        `[Verify] Updating subscription in DB for ${email}: plan=${planName}, start=${startDate}, end=${endDate}`
+  while (attempt <= maxRetries) {
+    try {
+      console.log(`[Verify] Attempt ${attempt + 1} to verify payment`);
+      response = await axios.get(
+        `https://api.paystack.co/transaction/verify/${reference}`,
+        axiosConfig
       );
+      break; // success, exit retry loop
+    } catch (error) {
+      attempt++;
+      console.error(`[Verify] Attempt ${attempt} failed:`, error.message);
+      if (attempt > maxRetries) {
+        const errData = error.response?.data || error.message;
+        console.error("[Verify] All retries failed, returning error to client:", errData);
+        return res.status(500).json({
+          message: "Verification failed after multiple attempts",
+          error: errData,
+        });
+      }
+      // wait 1 second before retrying
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
 
+  const data = response.data.data;
+  console.log("[Verify] Paystack response data:", data);
+
+  if (data.status === "success") {
+    const email = data.customer.email;
+    const planName =
+      data.plan?.name?.toLowerCase() ||
+      data.metadata?.plan_name?.toLowerCase() ||
+      "unknown";
+
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + 1);
+
+    try {
       await pool.query(
         `UPDATE admins 
          SET subscription_plan = $1,
@@ -114,24 +129,17 @@ router.get("/paystack/verify/:reference", async (req, res) => {
          WHERE email = $4`,
         [planName, startDate, endDate, email]
       );
-
-      console.log(`[Verify] Database updated successfully for ${email}. Redirecting to success page.`);
-      return res.redirect(
-        "https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentsuccess"
-      );
-    } else {
-      console.log(`[Verify] Payment status not successful. Redirecting to failure page.`);
-      return res.redirect(
-        "https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentfailed"
-      );
+      console.log(`[Verify] Updated subscription for ${email}`);
+    } catch (dbError) {
+      console.error("[Verify] DB update failed:", dbError.message);
+      // You might want to handle this error or continue anyway
     }
-  } catch (error) {
-    const errData = error?.response?.data || error.message;
-    console.error("[Verify] Paystack verification failed:", errData);
-    return res.status(500).json({
-      message: "Verification failed",
-      error: errData,
-    });
+
+    // Instead of redirecting, respond with JSON so frontend can handle it
+    return res.json({ status: "success", message: "Payment verified successfully." });
+  } else {
+    console.log("[Verify] Payment status not successful:", data.status);
+    return res.status(400).json({ status: "failed", message: "Payment verification failed." });
   }
 });
 
