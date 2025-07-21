@@ -23,6 +23,24 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+async function checkSubscription(admin) {
+  const now = new Date();
+
+  if (admin.subscription_status === "trial") {
+    const trialEnd = new Date(admin.trial_end_date);
+    if (now > trialEnd) return "expired";
+    return "trial";
+  }
+
+  if (admin.subscription_status === "active") {
+    const endDate = new Date(admin.subscription_end_date);
+    if (now > endDate) return "expired";
+    return "active";
+  }
+
+  return "none";
+}
+
 // ✅ Admin Signup
 router.post("/signup", async (req, res) => {
   const { schoolname, username, email, password } = req.body;

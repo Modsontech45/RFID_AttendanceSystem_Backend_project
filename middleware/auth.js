@@ -57,27 +57,11 @@ const authenticateTeacher = (req, res, next) => {
 };
 
 
-async function checkSubscription(admin) {
-  const now = new Date();
 
-  if (admin.subscription_status === "trial") {
-    const trialEnd = new Date(admin.trial_end_date);
-    if (now > trialEnd) return "expired";
-    return "trial";
-  }
-
-  if (admin.subscription_status === "active") {
-    const endDate = new Date(admin.subscription_end_date);
-    if (now > endDate) return "expired";
-    return "active";
-  }
-
-  return "none";
-}
 
 
 module.exports = {
   authenticateAdmin,
   authenticateTeacher,
-  checkSubscription,
+  
 };
