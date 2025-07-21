@@ -8,7 +8,7 @@ const getMessage = require("../utils/messages");
 const axios = require("axios");
 require("dotenv").config();
 
-const { checkSubscription } = require('./middleware/auth.js'); // Import the subscription check function
+const { checkSubscription } = require('../middleware/auth'); // Import the subscription check function
 
 const router = express.Router();
 
