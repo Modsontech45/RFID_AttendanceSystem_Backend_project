@@ -38,7 +38,7 @@ router.post("/paystack/initialize", async (req, res) => {
         amount: plans[plan].amount, // Add the amount in kobo
         currency: "GHS",
         plan: plans[plan].code,     // Use the plan code
-        callback_url: "https://yourfrontend.com/payment/callback",
+        callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment/:reference",
         channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
         metadata: {
           plan_name: plan
@@ -67,7 +67,6 @@ router.post("/paystack/initialize", async (req, res) => {
   }
 });
 
-// Verify transaction
 router.get("/paystack/verify/:reference", async (req, res) => {
   const { reference } = req.params;
 
@@ -85,8 +84,9 @@ router.get("/paystack/verify/:reference", async (req, res) => {
 
     if (data.status === "success") {
       const email = data.customer.email;
-      const planCode = data.plan.plan_code;
-      const planName = data.plan.name.toLowerCase();
+
+      const planName =
+        data.plan?.name?.toLowerCase() || data.metadata?.plan_name?.toLowerCase() || "unknown";
 
       const startDate = new Date();
       const endDate = new Date();
@@ -102,14 +102,15 @@ router.get("/paystack/verify/:reference", async (req, res) => {
         [planName, startDate, endDate, email]
       );
 
-      res.redirect("https://yourfrontend.com/payment-success");
+      return res.redirect("https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentsuccess");
     } else {
-      res.redirect("https://yourfrontend.com/payment-failed");
+      return res.redirect("https://rfid-attendance-synctuario-theta.vercel.app/admin/paymentfailed");
     }
   } catch (err) {
     console.error("Paystack verification failed:", err.message);
-    res.status(500).json({ message: "Verification failed" });
+    return res.status(500).json({ message: "Verification failed" });
   }
 });
+
 
 module.exports = router;
