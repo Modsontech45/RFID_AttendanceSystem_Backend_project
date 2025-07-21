@@ -9,7 +9,7 @@ const router = express.Router();
 
 const plans = {
     enterprise: {
-      code: "PLN_ebucle4ojvpl5hk",
+      code: "PLN_x6kb1kh4122bm3q",
       amount: 10000 // Custom amount in kobo
     },
     professional: {
@@ -17,7 +17,8 @@ const plans = {
       amount: 6000 // $60 in kobo (GHS 60.00 * 100)
     },
   starter: {
-    code: "PLN_x6kb1kh4122bm3q",
+   
+     code: "PLN_ebucle4ojvpl5hk",
     amount: 3000 // $30 in kobo (GHS 30.00 * 100)
   }
 };
