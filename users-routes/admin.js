@@ -193,13 +193,13 @@ router.post("/login", async (req, res) => {
     }
     
     // If no subscription at all, redirect to subscription page
-    if (subStatus === "none" || subStatus === "inactive") {
-      return res.status(403).json({ 
-        message: "Please subscribe to access the admin panel.",
-        redirectTo: "/subscription",
-        needsSubscription: true
-      });
-    }
+    // if (subStatus === "none" || subStatus === "inactive") {
+    //   return res.status(403).json({ 
+    //     message: "Please subscribe to access the admin panel.",
+    //     redirectTo: "/subscription",
+    //     needsSubscription: true
+    //   });
+    // }
 
     let apiKey = admin.api_key;
     if (!apiKey) {
