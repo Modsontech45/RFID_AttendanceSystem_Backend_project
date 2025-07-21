@@ -56,6 +56,36 @@ const authenticateTeacher = (req, res, next) => {
   });
 };
 
+async function checkSubscription(admin) {
+  const now = new Date();
+  console.log("🕒 Current time:", now);
+  console.log("🧾 Admin subscription status:", admin.subscription_status);
+
+  if (admin.subscription_status === "trial") {
+    const trialEnd = new Date("2025-07-20");
+    console.log("⏳ Trial ends at:", trialEnd);
+    if (now > trialEnd) {
+      console.log("🚫 Trial expired");
+      return "expired";
+    }
+    console.log("✅ Trial active");
+    return "trial";
+  }
+
+  if (admin.subscription_status === "active") {
+    const endDate = new Date("2025-07-20");
+    console.log("📆 Subscription ends at:", endDate);
+    if (now > endDate) {
+      console.log("🚫 Subscription expired");
+      return "expired";
+    }
+    console.log("✅ Subscription active");
+    return "active";
+  }
+
+  console.log("❓ No subscription found");
+  return "none";
+}
 
 
 
@@ -63,5 +93,6 @@ const authenticateTeacher = (req, res, next) => {
 module.exports = {
   authenticateAdmin,
   authenticateTeacher,
+  checkSubscription,
   
 };
