@@ -12,7 +12,7 @@ router.get("/", verifyApiKey, async (req, res) => {
 
   try {
     const requesterApiKey = req.user.api_key;
-     const subStatus = await checkSubscription(admin);
+     const subStatus = await checkSubscription(req.user);
     if (subStatus === "expired") {
       return res.status(403).json({ 
         message: "Subscription expired. Please renew.",

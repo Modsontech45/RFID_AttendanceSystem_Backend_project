@@ -21,7 +21,7 @@ router.get("/", verifyApiKey, async (req, res) => {
     }
 
     // Check subscription status
-    const subStatus = await checkSubscription(admin);
+    const subStatus = await checkSubscription(req.user);
 
     if (subStatus !== "active") {
       return res.status(403).json({
