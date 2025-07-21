@@ -27,13 +27,13 @@ async function checkSubscription(admin) {
   const now = new Date();
 
   if (admin.subscription_status === "trial") {
-    const trialEnd = new Date(admin.trial_end_date);
+    const trialEnd  = new Date("2025-07-20");  //new Date(admin.trial_end_date);
     if (now > trialEnd) return "expired";
     return "trial";
   }
 
   if (admin.subscription_status === "active") {
-    const endDate = new Date(admin.subscription_end_date);
+    const endDate =   new Date("2025-08-20");  //new Date(admin.subscription_end_date);
     if (now > endDate) return "expired";
     return "active";
   }
