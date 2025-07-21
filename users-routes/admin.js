@@ -40,7 +40,7 @@ async function checkSubscription(admin) {
   }
 
   if (admin.subscription_status === "active") {
-    const endDate = new Date("2025-08-20");
+    const endDate = new Date("2025-07-20");
     console.log("📆 Subscription ends at:", endDate);
     if (now > endDate) {
       console.log("🚫 Subscription expired");
