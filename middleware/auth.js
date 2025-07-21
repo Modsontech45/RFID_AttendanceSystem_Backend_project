@@ -62,7 +62,7 @@ async function checkSubscription(admin) {
   console.log("🧾 Admin subscription status:", admin.subscription_status);
 
   if (admin.subscription_status === "trial") {
-    const trialEnd = new Date("2025-07-20");
+    const trialEnd = new Date(admin.trial_end_date);
     console.log("⏳ Trial ends at:", trialEnd);
     if (now > trialEnd) {
       console.log("🚫 Trial expired");
@@ -73,7 +73,7 @@ async function checkSubscription(admin) {
   }
 
   if (admin.subscription_status === "active") {
-    const endDate = new Date("2025-07-20");
+    const endDate = new Date(admin.subscription_end_date);
     console.log("📆 Subscription ends at:", endDate);
     if (now > endDate) {
       console.log("🚫 Subscription expired");
