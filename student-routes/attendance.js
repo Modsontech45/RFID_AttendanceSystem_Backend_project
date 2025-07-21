@@ -18,7 +18,7 @@ router.get("/", verifyApiKey, async (req, res) => {
         .json({ message: getMessage(lang, "attendance.noApiKey") });
     }
     // Check subscription status
-    const subStatus = "expired" //await checkSubscription(admin);
+    const subStatus = await checkSubscription(admin);
 
     if (subStatus === "expired") {
       return res.status(403).json({
