@@ -4,6 +4,7 @@ const router = express.Router();
 const verifyApiKey = require("../middleware/verifyApiKey");
 const nodemailer = require('nodemailer');
 const getMessage = require("../utils/messages");
+const { checkSubscription } = require('../middleware/auth');
 
 // GET all students
 router.get("/", verifyApiKey, async (req, res) => {
@@ -11,6 +12,14 @@ router.get("/", verifyApiKey, async (req, res) => {
 
   try {
     const requesterApiKey = req.user.api_key;
+     const subStatus = await checkSubscription(admin);
+    if (subStatus === "expired") {
+      return res.status(403).json({ 
+        message: "Subscription expired. Please renew.",
+        redirectTo: "https://rfid-attendance-synctuario-theta.vercel.app/pricing",
+        subscriptionExpired: true
+      });
+    }
 
     if (!requesterApiKey) {
       return res.status(403).json({ message: getMessage(lang, 'students.noApiKey') });

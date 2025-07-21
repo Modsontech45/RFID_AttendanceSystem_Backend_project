@@ -388,15 +388,15 @@ router.post("/paystack/initialize", async (req, res) => {
 
 
 
-    // // 🔔 Check subscription status
-    // const subStatus = await checkSubscription(admin);
-    // if (subStatus === "expired") {
-    //   return res.status(403).json({ 
-    //     message: "Subscription expired. Please renew.",
-    //     redirectTo: "/subscription",
-    //     subscriptionExpired: true
-    //   });
-    // }
+    // 🔔 Check subscription status
+    const subStatus = await checkSubscription(admin);
+    if (subStatus === "expired") {
+      return res.status(403).json({ 
+        message: "Subscription expired. Please renew.",
+        redirectTo: "/subscription",
+        subscriptionExpired: true
+      });
+    }
     
     // // If no subscription at all, redirect to subscription page
     // if (subStatus === "none" || subStatus === "inactive") {
