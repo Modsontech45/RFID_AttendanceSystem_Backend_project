@@ -7,7 +7,7 @@ const { checkSubscription } = require('../middleware/auth');
 // GET attendance records filtered by API key
 router.get('/', verifyApiKey, async (req, res) => {
   const lang = req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
-
+ const admin = req.admin;
   try {
     const requesterApiKey = req.user.api_key;
 
