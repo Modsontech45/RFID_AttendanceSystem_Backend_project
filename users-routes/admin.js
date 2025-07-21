@@ -7,7 +7,8 @@ const crypto = require("crypto");
 const getMessage = require("../utils/messages");
 const axios = require("axios");
 require("dotenv").config();
-import { checkSubscription } from "../middleware/auth";
+
+const { checkSubscription } = require('./middleware/auth.js'); // Import the subscription check function
 
 const router = express.Router();
 
