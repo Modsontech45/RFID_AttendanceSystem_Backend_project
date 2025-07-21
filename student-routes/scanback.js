@@ -269,17 +269,12 @@ router.post('/login', async (req, res) => {
   }
 });
 
-const plans = {
-  Starter: "PLN_x6kb1kh4122bm3q",
-  Professional: "PLN_td9knl16tw6lp1l",
-  Enterprise: "PLN_ebucle4ojvpl5hk",
-};
 
-// const plans = {
-//   starter: "300",       // These look like amounts, NOT Paystack plan codes
-//   professional: "222",
-//   enterprise: "600",
-// };
+const plans = {
+  starter: "300",       // These look like amounts, NOT Paystack plan codes
+  professional: "222",
+  enterprise: "600",
+};
 
 router.post("/paystack/initialize", async (req, res) => {
   const { email, plan } = req.body;

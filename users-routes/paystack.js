@@ -23,24 +23,55 @@ const router = express.Router();
 //   }
 // };
 
+// router.post("/paystack/initialize", async (req, res) => {
+//   const { email, plan } = req.body;
 
+//   if (!plans[plan]) {
+//     return res.status(400).json({ message: "Invalid plan" });
+//   }
 
+//   try {
+//     const response = await axios.post(
+//       "https://api.paystack.co/transaction/initialize",
+//       {
+//         email,
+//         amount: plans[plan].amount, // Add the amount in kobo
+//         currency: "GHS",
+//         plan: plans[plan].code,     // Use the plan code
+//         callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment",
+//         channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
+//         metadata: {
+//           plan_name: plan
+//         }
+//       },
+//       {
+//         headers: {
+//           Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
+
+//     res.status(200).json({
+//       message: "Payment initiated",
+//       authorization_url: response.data.data.authorization_url,
+//       reference: response.data.data.reference
+//     });
+//   } catch (error) {
+//     const errData = error.response?.data || error.message;
+//     console.error("Paystack Init Error:", errData);
+//     res.status(500).json({ 
+//       message: "Paystack initialization failed", 
+//       error: errData 
+//     });
+//   }
+// });
 
 
 const plans = {
-    enterprise: {
-      code: "PLN_hffe5wh7gl9bqt4",
-      amount: 10000 // Custom amount in kobo
-    },
-    professional: {
-      code: "PLN_er7em0l3kt9e4aa", 
-      amount: 6000 // $60 in kobo (GHS 60.00 * 100)
-    },
-  starter: {
-   
-     code: "PLN_qfc9wlvxfcfjetp",
-    amount: 3000 // $30 in kobo (GHS 30.00 * 100)
-  }
+  starter: "300",       // These look like amounts, NOT Paystack plan codes
+  professional: "222",
+  enterprise: "600",
 };
 
 router.post("/paystack/initialize", async (req, res) => {
@@ -50,19 +81,24 @@ router.post("/paystack/initialize", async (req, res) => {
     return res.status(400).json({ message: "Invalid plan" });
   }
 
+  // If you want to use Paystack subscription plans, plans[plan] must be plan codes like "PLN_xxx"
+  // But here they are amounts (strings), so you CANNOT send them as `plan: plans[plan]`
+
+  // Convert amount string to number of pesewas (smallest unit)
+  const amountInPesewas = Number(plans[plan]) * 100;
+
+  if (isNaN(amountInPesewas) || amountInPesewas <= 0) {
+    return res.status(400).json({ message: "Invalid amount for the selected plan" });
+  }
+
   try {
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email,
-        amount: plans[plan].amount, // Add the amount in kobo
+        amount: amountInPesewas,  // send amount (number in pesewas) here
         currency: "GHS",
-        plan: plans[plan].code,     // Use the plan code
-        callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment",
-        channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
-        metadata: {
-          plan_name: plan
-        }
+        callback_url: "https://yourdomain.com/paystack/callback",
       },
       {
         headers: {
@@ -75,17 +111,15 @@ router.post("/paystack/initialize", async (req, res) => {
     res.status(200).json({
       message: "Payment initiated",
       authorization_url: response.data.data.authorization_url,
-      reference: response.data.data.reference
     });
   } catch (error) {
     const errData = error.response?.data || error.message;
     console.error("Paystack Init Error:", errData);
-    res.status(500).json({ 
-      message: "Paystack initialization failed", 
-      error: errData 
-    });
+    res.status(500).json({ message: "Paystack initialization failed", error: errData });
   }
 });
+
+
 
 router.get("/paystack/verify/:reference", async (req, res) => {
   const { reference } = req.params;
