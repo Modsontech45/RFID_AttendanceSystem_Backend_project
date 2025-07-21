@@ -236,6 +236,10 @@ router.post("/login", async (req, res) => {
         role: admin.role,
         api_key: apiKey,
         created_at: admin.created_at,
+        subscription_status: admin.subscription_status || 'inactive',
+        subscription_plan: admin.subscription_plan || 'free',
+        subscription_start_date: admin.subscription_start_date || null,
+        subscription_end_date: admin.subscription_end_date || null,
       },
     });
   } catch (err) {
