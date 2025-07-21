@@ -253,7 +253,7 @@ router.post("/login", async (req, res) => {
     res.status(200).json({
       message: getMessage(lang, "admin.loginSuccess"),
       token,
-      subscriptionStatus: subStatus,
+      // subscriptionStatus: subStatus,
       admin: {
         id: admin.id,
         schoolname: admin.schoolname,
