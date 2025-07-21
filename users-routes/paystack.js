@@ -98,7 +98,7 @@ router.post("/paystack/initialize", async (req, res) => {
         email,
         amount: amountInPesewas,  // send amount (number in pesewas) here
         currency: "GHS",
-        callback_url: "https://yourdomain.com/paystack/callback",
+        callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment",
       },
       {
         headers: {
