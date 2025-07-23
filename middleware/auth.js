@@ -69,7 +69,7 @@ async function checkSubscription(admin) {
       return "expired";
     }
     console.log("✅ Trial active");
-    return "trial";
+    return "expired";  // Return "trial" if still in trial period
   }
 
   if (admin.subscription_status === "active") {
@@ -80,7 +80,7 @@ async function checkSubscription(admin) {
       return "expired";
     }
     console.log("✅ Subscription active");
-    return "active";
+    return "expired";// Return "active" if subscription is still valid
   }
 
   console.log("❓ No subscription found");

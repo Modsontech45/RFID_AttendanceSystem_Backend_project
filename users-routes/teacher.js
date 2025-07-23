@@ -1,7 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const verifyApiKey = require("../middleware/verifyApiKey");
-const { authenticateAdmin, authenticateTeacher } = require("../middleware/auth");
+const { authenticateAdmin, authenticateTeacher,checkSubscription } = require("../middleware/auth");
 const { sendAcceptanceEmail, sendEmail } = require("../mailer");
 const jwt = require("jsonwebtoken");
 const getMessage = require("../utils/messages");
@@ -46,6 +46,7 @@ router.post("/add", authenticateAdmin, async (req, res) => {
 });
 
 // Teacher login
+
 router.post("/login", async (req, res) => {
   const { email } = req.body;
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
@@ -56,6 +57,23 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: getMessage(lang, 'teacher.notFound') });
 
     const teacher = result.rows[0];
+
+    // ✅ Step 1: Get the admin who added this teacher
+    const adminQuery = await pool.query("SELECT * FROM admins WHERE id = $1", [teacher.added_by]);
+    const admin = adminQuery.rows[0];
+    if (!admin)
+      return res.status(403).json({ message: "Admin not found for this teacher." });
+
+    // ✅ Step 2: Check subscription
+    const status = await checkSubscription(admin);
+    if (status === "expired") {
+      return res.status(403).json({
+        message: "Subscription expired. Contact your admin.",
+        redirectTo: "/pricing"
+      });
+    }
+
+    // ✅ Step 3: Proceed with login
     const token = jwt.sign(
       { id: teacher.id, role: teacher.role || "teacher" },
       SECRET_KEY,
@@ -69,7 +87,7 @@ router.post("/login", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Login error:", err);
+    console.error("Teacher login error:", err);
     res.status(500).json({ message: getMessage(lang, 'common.internalError') });
   }
 });
