@@ -23,7 +23,7 @@ router.get("/", verifyApiKey, async (req, res) => {
     // Check subscription status
     const subStatus = await checkSubscription(req.user);
 
-    if (subStatus !== "active" || subStatus !== "trial") {
+    if (subStatus === "expired") {
       return res.status(403).json({
         message: "Subscription expired. Please renew.",
         redirectTo: "https://rfid-attendance-synctuario-theta.vercel.app/pricing",
