@@ -240,6 +240,9 @@ router.post("/login", async (req, res) => {
         subscription_plan: admin.subscription_plan || 'free',
         subscription_start_date: admin.subscription_start_date || null,
         subscription_end_date: admin.subscription_end_date || null,
+        trial_end_date: admin.trial_end_date || null,
+        trial_start_date: admin.trial_start_date || null,
+        verified: admin.verified || false,
       },
     });
   } catch (err) {
