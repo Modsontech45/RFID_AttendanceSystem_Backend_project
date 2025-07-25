@@ -52,48 +52,58 @@ router.post("/login", async (req, res) => {
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
 
   try {
-    const result = await pool.query("SELECT * FROM teachers WHERE email = $1", [email]);
-    if (result.rows.length === 0)
+    // 🔍 Find teacher by email
+    const teacherResult = await pool.query("SELECT * FROM teachers WHERE email = $1", [email]);
+    if (teacherResult.rows.length === 0) {
       return res.status(401).json({ message: getMessage(lang, 'teacher.notFound') });
+    }
 
-    const teacher = result.rows[0];
+    const teacher = teacherResult.rows[0];
 
-    // ✅ Get the admin who added this teacher
-    const adminQuery = await pool.query("SELECT * FROM admins WHERE id = $1", [teacher.added_by]);
-    const admin = adminQuery.rows[0];
-    if (!admin)
+    // 👤 Get admin info who added the teacher
+    const adminResult = await pool.query("SELECT * FROM admins WHERE id = $1", [teacher.added_by]);
+    if (adminResult.rows.length === 0) {
       return res.status(403).json({ message: "Admin not found for this teacher." });
+    }
 
-    // ✅ Check subscription
-    const status = await checkSubscription(admin);
-    if (status === "expired") {
+    const admin = adminResult.rows[0];
+
+    // ⏳ Check subscription status
+    const subscriptionStatus = await checkSubscription(admin);
+    if (subscriptionStatus === "expired") {
       return res.status(403).json({
         message: "Subscription expired. Contact your admin.",
         redirectTo: "/pricing"
       });
     }
 
-    // ✅ Proceed with login
+    // 🔐 Generate JWT token
     const token = jwt.sign(
       { id: teacher.id, role: teacher.role || "teacher" },
       SECRET_KEY,
       { expiresIn: "7d" }
     );
 
-    // ✅ Return teacher + admin info
+    // ✅ Build admin data for frontend
+    const adminData = {
+      id: admin.id,
+      schoolname: admin.schoolname,
+      username: admin.username
+    };
+
+    // 🪵 Log admin data for debug
+    console.log("✅ Teacher login successful. Admin data:", adminData);
+
+    // 🚀 Send login response
     res.status(200).json({
       message: getMessage(lang, 'teacher.loginSuccess'),
       token,
       teacher,
-      admin: {
-        id: admin.id,
-        schoolname: admin.schoolname,
-        username: admin.username,
-      }
+      admin: adminData
     });
 
   } catch (err) {
-    console.error("Teacher login error:", err);
+    console.error("❌ Teacher login error:", err);
     res.status(500).json({ message: getMessage(lang, 'common.internalError') });
   }
 });
