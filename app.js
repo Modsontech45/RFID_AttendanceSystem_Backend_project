@@ -55,8 +55,8 @@ app.use(bodyParser.json());
 
 app.use('/api/categories',verifyApiKey, apiKeyRateLimiter, categoryRoutes); // ✅ REGISTER the route here
 
-app.use('/api/devices',verifyApiKey, apiKeyRateLimiter, deviceRoutes);
-app.use('/api/admins', verifyApiKey, apiKeyRateLimiter, adminRoutes);
+app.use('/api/devices', deviceRoutes);
+app.use('/api/admins',  adminRoutes);
 app.use('/api/admin',verifyApiKey, apiKeyRateLimiter, adminRoutes);
 app.use('/api/teachers',verifyApiKey, apiKeyRateLimiter, teacherRoutes);
 app.use('/api/reset',verifyApiKey, apiKeyRateLimiter, resetPasswordRoutes);
@@ -64,8 +64,8 @@ app.use('/api',verifyApiKey, apiKeyRateLimiter, timeSettingsRouter);
 app.use('/api/',verifyApiKey, apiKeyRateLimiter, paymentRoutes);
 
 
-app.use('/api/students',verifyApiKey, apiKeyRateLimiter, require('./student-routes/students'));
-app.use('/api/attendance',verifyApiKey, apiKeyRateLimiter, require('./student-routes/attendance'));
+app.use('/api/students', require('./student-routes/students'));
+app.use('/api/attendance', require('./student-routes/attendance'));
 app.use('/api/scan', require('./student-routes/scan'));
 app.use('/api/register', require('./student-routes/register'));
 
