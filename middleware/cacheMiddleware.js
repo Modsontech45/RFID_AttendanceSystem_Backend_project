@@ -1,24 +1,19 @@
-const Redis = require('ioredis');
-const redis = new Redis();
+const memoryCache = new Map();
 
-async function cacheMiddleware(req, res, next) {
-  const key = `cache:${req.originalUrl}`;
-  try {
-    const cachedData = await redis.get(key);
-    if (cachedData) {
-      return res.json(JSON.parse(cachedData));
-    }
-    // Override res.json to cache the response before sending
-    res.sendResponse = res.json;
-    res.json = (body) => {
-      redis.set(key, JSON.stringify(body), 'EX', 60); // Cache expires in 60 seconds
-      res.sendResponse(body);
-    };
-    next();
-  } catch (err) {
-    console.error('Redis cache error:', err);
-    next(); // On error, just proceed without caching
+function cacheMiddleware(req, res, next) {
+  const key = req.originalUrl;
+  if (memoryCache.has(key)) {
+    return res.json(memoryCache.get(key));
   }
+
+  res.sendResponse = res.json;
+  res.json = (body) => {
+    memoryCache.set(key, body);
+    setTimeout(() => memoryCache.delete(key), 60 * 1000); // expires in 60s
+    res.sendResponse(body);
+  };
+
+  next();
 }
 
 module.exports = cacheMiddleware;
