@@ -56,9 +56,9 @@ app.use(bodyParser.json());
 app.use('/api/categories',verifyApiKey, apiKeyRateLimiter, categoryRoutes); // ✅ REGISTER the route here
 
 app.use('/api/devices',verifyApiKey, apiKeyRateLimiter, deviceRoutes);
-app.use('/api/admins', verifyApiKey, apiKeyRateLimiter, adminRoutes);
-app.use('/api/admin',verifyApiKey, apiKeyRateLimiter, adminRoutes);
-app.use('/api/teachers',verifyApiKey, apiKeyRateLimiter, teacherRoutes);
+app.use('/api/admins',  apiKeyRateLimiter, adminRoutes);
+app.use('/api/admin', apiKeyRateLimiter, adminRoutes);
+app.use('/api/teachers', apiKeyRateLimiter, teacherRoutes);
 app.use('/api/reset',verifyApiKey, apiKeyRateLimiter, resetPasswordRoutes);
 app.use('/api',verifyApiKey, apiKeyRateLimiter, timeSettingsRouter);
 app.use('/api/',verifyApiKey, apiKeyRateLimiter, paymentRoutes);
