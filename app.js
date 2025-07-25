@@ -2,8 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const apiKeyRateLimiter = require('./middleware/apiKeyRateLimiter');
-const verifyApiKey = require('./middleware/verifyApiKey');
 
 const adminRoutes = require('./users-routes/admin');
 const teacherRoutes = require('./users-routes/teacher');
@@ -53,15 +51,15 @@ app.use(cors({
 
 app.use(bodyParser.json());
 
-app.use('/api/categories',verifyApiKey, apiKeyRateLimiter, categoryRoutes); // ✅ REGISTER the route here
+app.use('/api/categories', categoryRoutes); // ✅ REGISTER the route here
 
 app.use('/api/devices', deviceRoutes);
-app.use('/api/admins',  adminRoutes);
-app.use('/api/admin',verifyApiKey, apiKeyRateLimiter, adminRoutes);
-app.use('/api/teachers',verifyApiKey, apiKeyRateLimiter, teacherRoutes);
-app.use('/api/reset',verifyApiKey, apiKeyRateLimiter, resetPasswordRoutes);
-app.use('/api',verifyApiKey, apiKeyRateLimiter, timeSettingsRouter);
-app.use('/api/',verifyApiKey, apiKeyRateLimiter, paymentRoutes);
+app.use('/api/admins', adminRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/teachers', teacherRoutes);
+app.use('/api/reset', resetPasswordRoutes);
+app.use('/api', timeSettingsRouter);
+app.use('/api/', paymentRoutes);
 
 
 app.use('/api/students', require('./student-routes/students'));
