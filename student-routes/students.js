@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const router = express.Router();
 const verifyApiKey = require("../middleware/verifyApiKey");
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 const nodemailer = require('nodemailer');
 const getMessage = require("../utils/messages");
 const { checkSubscription } = require('../middleware/auth');
