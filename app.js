@@ -65,9 +65,9 @@ app.use('/api/',verifyApiKey, apiKeyRateLimiter, paymentRoutes);
 
 
 app.use('/api/students',verifyApiKey, apiKeyRateLimiter, require('./student-routes/students'));
-app.use('/api/attendance',verifyApiKey, apiKeyRateLimiter, require('./student-routes/attendance'));
-app.use('/api/scan',verifyApiKey, apiKeyRateLimiter, require('./student-routes/scan'));
-app.use('/api/register',verifyApiKey, apiKeyRateLimiter, require('./student-routes/register'));
+app.use('/api/attendance', apiKeyRateLimiter, require('./student-routes/attendance'));
+app.use('/api/scan', require('./student-routes/scan'));
+app.use('/api/register', require('./student-routes/register'));
 
 app.listen(port, () => {
   console.log(`✅ Server running at http://localhost:${port}`);
