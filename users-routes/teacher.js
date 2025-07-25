@@ -58,13 +58,13 @@ router.post("/login", async (req, res) => {
 
     const teacher = result.rows[0];
 
-    // ✅ Step 1: Get the admin who added this teacher
+    // ✅ Get the admin who added this teacher
     const adminQuery = await pool.query("SELECT * FROM admins WHERE id = $1", [teacher.added_by]);
     const admin = adminQuery.rows[0];
     if (!admin)
       return res.status(403).json({ message: "Admin not found for this teacher." });
 
-    // ✅ Step 2: Check subscription
+    // ✅ Check subscription
     const status = await checkSubscription(admin);
     if (status === "expired") {
       return res.status(403).json({
@@ -73,17 +73,23 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // ✅ Step 3: Proceed with login
+    // ✅ Proceed with login
     const token = jwt.sign(
       { id: teacher.id, role: teacher.role || "teacher" },
       SECRET_KEY,
       { expiresIn: "7d" }
     );
 
+    // ✅ Return teacher + admin info
     res.status(200).json({
       message: getMessage(lang, 'teacher.loginSuccess'),
       token,
-      teacher
+      teacher,
+      admin: {
+        id: admin.id,
+        schoolname: admin.schoolname,
+        username: admin.username,
+      }
     });
 
   } catch (err) {
