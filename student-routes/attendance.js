@@ -1,12 +1,13 @@
 const express = require("express");
 const pool = require("../db");
 const router = express.Router();
+const cacheMiddleware = require('./middleware/cacheMiddleware');
 const verifyApiKey = require("../middleware/verifyApiKey");
 const getMessage = require("../utils/messages");
 const { checkSubscription } = require("../middleware/auth");
 
 // GET attendance records filtered by API key
-router.get("/", verifyApiKey, async (req, res) => {
+router.get("/",cacheMiddleware, verifyApiKey, async (req, res) => {
   const lang =
     req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
   const admin = req.admin;

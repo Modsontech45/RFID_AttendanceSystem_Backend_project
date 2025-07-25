@@ -1,4 +1,8 @@
-module.exports = async function verifyApiKey(req, res, next) {
+ 
+const pool = require("../db");
+const getMessage = require("../utils/messages");
+ 
+ module.exports = async function verifyApiKey(req, res, next) {
   const lang = req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
 
   try {

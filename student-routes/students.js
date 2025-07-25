@@ -7,7 +7,7 @@ const getMessage = require("../utils/messages");
 const { checkSubscription } = require('../middleware/auth');
 
 // GET all students
-router.get("/", verifyApiKey, async (req, res) => {
+router.get("/",cacheMiddleware, verifyApiKey, async (req, res) => {
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
 
   try {

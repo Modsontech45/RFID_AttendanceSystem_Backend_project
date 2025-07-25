@@ -5,7 +5,7 @@ const verifyApiKey = require("../middleware/verifyApiKey");
 const getMessage = require("../utils/messages");
 
 // GET time settings for the given API key
-router.get("/time-settings", verifyApiKey, async (req, res) => {
+router.get("/time-settings",cacheMiddleware, verifyApiKey, async (req, res) => {
   const lang = req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
   const apiKey = req.user.api_key;
 
