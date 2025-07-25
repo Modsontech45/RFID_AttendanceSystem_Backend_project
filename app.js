@@ -53,9 +53,9 @@ app.use(cors({
 
 app.use(bodyParser.json());
 
-app.use('/api/categories',verifyApiKey, apiKeyRateLimiter, categoryRoutes); // ✅ REGISTER the route here
+app.use('/api/categories',apiKeyRateLimiter, categoryRoutes); // ✅ REGISTER the route here
 
-app.use('/api/devices', apiKeyRateLimiter, deviceRoutes);
+app.use('/api/devices', deviceRoutes);
 app.use('/api/admins',  apiKeyRateLimiter, adminRoutes);
 app.use('/api/admin', apiKeyRateLimiter, adminRoutes);
 app.use('/api/teachers', apiKeyRateLimiter, teacherRoutes);
@@ -64,8 +64,8 @@ app.use('/api', apiKeyRateLimiter, timeSettingsRouter);
 app.use('/api/', apiKeyRateLimiter, paymentRoutes);
 
 
-app.use('/api/students', apiKeyRateLimiter, require('./student-routes/students'));
-app.use('/api/attendance', apiKeyRateLimiter, require('./student-routes/attendance'));
+app.use('/api/students', require('./student-routes/students'));
+app.use('/api/attendance', require('./student-routes/attendance'));
 app.use('/api/scan', require('./student-routes/scan'));
 app.use('/api/register', require('./student-routes/register'));
 
