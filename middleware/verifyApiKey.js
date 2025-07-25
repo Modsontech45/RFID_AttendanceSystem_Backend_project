@@ -1,9 +1,10 @@
- 
+
 const pool = require("../db");
 const getMessage = require("../utils/messages");
- 
- module.exports = async function verifyApiKey(req, res, next) {
-  const lang = req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
+
+module.exports = async function verifyApiKey(req, res, next) {
+  const lang =
+    req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
 
   try {
     const apiKey =
@@ -19,7 +20,7 @@ const getMessage = require("../utils/messages");
 
     // Check admins
     const adminCheck = await pool.query(
-      "SELECT id, email, api_key, subscription_status, trial_end_date, subscription_end_date FROM admins WHERE api_key = $1",
+      "SELECT id, email, api_key , subscription_status, trial_end_date, subscription_end_date FROM admins WHERE api_key = $1",
       [apiKey]
     );
 
