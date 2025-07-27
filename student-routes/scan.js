@@ -37,23 +37,38 @@ router.post('/', async (req, res) => {
     }
 
     const student = studentRes.rows[0];
-    const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
+const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
 
-// If student's api_key doesn't match the one in the request
 if (requestApiKey && requestApiKey !== student.api_key) {
-  const schoolRes = await pool.query('SELECT name FROM admins WHERE api_key = $1 LIMIT 1', [student.api_key]);
+  // Check if this UID exists in the current requester's school
+  const sameUidSameSchool = await pool.query(
+    'SELECT name FROM users WHERE uid = $1 AND api_key = $2 LIMIT 1',
+    [uid, requestApiKey]
+  );
 
-  const otherSchool = schoolRes.rows[0]?.schoolname || 'another school';
-  return res.status(403).json({
-    message: `A student from "${otherSchool}" is trying to sign in to the wrong school.`,
-    student_uid: uid,
-    device_uid,
-    student_name: student.name,
-    sign: 0,
-    timestamp: now,
-    flag: 'Cross-school access attempt'
-  });
+  if (sameUidSameSchool.rows.length > 0) {
+    // There’s a student with this UID in the correct school — treat that one instead
+    student = sameUidSameSchool.rows[0]; // override the previously fetched student
+  } else {
+    // No match for UID in the current school — it's a cross-school access attempt
+    const schoolRes = await pool.query(
+      'SELECT schoolname FROM admins WHERE api_key = $1 LIMIT 1',
+      [student.api_key]
+    );
+
+    const otherSchool = schoolRes.rows[0]?.schoolname || 'another school';
+    return res.status(403).json({
+      message: `A student from "${otherSchool}" is trying to sign in to the wrong school.`,
+      student_uid: uid,
+      device_uid,
+      student_name: student.name,
+      sign: 0,
+      timestamp: now,
+      flag: 'Cross-school access attempt'
+    });
+  }
 }
+
 
     const dateStr = now.toISOString().slice(0, 10);
 
