@@ -72,13 +72,13 @@ if (requestApiKey && requestApiKey !== student.api_key) {
     console.log(`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`);
      
     return res.json({
-      message:getMessage(lang, 'scan.mismatch'),
+      message:getMessage(lang, 'scan.mismatch',otherSchool),
       student_uid: uid,
       device_uid,
       student_name: student.name,
       sign: 0,
       timestamp: new Date(),
-      flag: getMessage(lang, 'scan.mismatch')
+      flag: getMessage(lang, 'scan.mismatch',otherSchool)
     });
   }
 } else {
