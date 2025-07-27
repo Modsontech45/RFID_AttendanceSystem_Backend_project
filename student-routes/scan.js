@@ -50,16 +50,16 @@ router.post('/', async (req, res) => {
 const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
 
 console.log("🔐 Incoming request:");
-console.log("→ device_uid:", device_uid);
-console.log("→ uid:", uid);
+console.log("→ Device UID:", device_uid);
+console.log("→ UID:", uid);
 console.log("→ API key from request:", requestApiKey);
 console.log("→ Student's API key in database:", student.api_key);
 
-// If API keys don't match, investigate deeper
+// Check for API key mismatch
 if (requestApiKey && requestApiKey !== student.api_key) {
   console.log("⚠️ API key mismatch detected. Checking if UID belongs to the requesting school...");
 
-  // Check if UID exists under the requesting API key (same UID in different school)
+  // See if UID exists under the current API key (requesting school)
   const sameUidSameSchool = await pool.query(
     'SELECT * FROM students WHERE uid = $1 AND api_key = $2 LIMIT 1',
     [uid, requestApiKey]
@@ -67,62 +67,64 @@ if (requestApiKey && requestApiKey !== student.api_key) {
 
   if (sameUidSameSchool.rows.length > 0) {
     console.log("✅ UID found under the requesting API key. Proceeding with this student.");
-
-    // Override student to match the school associated with the current request
-    student = sameUidSameSchool.rows[0];
+    student = sameUidSameSchool.rows[0]; // Override with matching student
   } else {
     console.log("🚫 UID does not belong to the current school.");
 
     const schoolRes = await pool.query(
-      'SELECT schoolname FROM admins WHERE api_key = $1 LIMIT 1',
+      'SELECT schoolname, email, firstname FROM admins WHERE api_key = $1 LIMIT 1',
       [student.api_key]
     );
+
     const otherSchool = schoolRes.rows[0]?.schoolname || 'another school';
     const adminEmail = schoolRes.rows[0]?.email;
-    
+    const adminName = schoolRes.rows[0]?.firstname || 'Admin';
+    const studentName = student.name || 'Unknown Student';
+    const studentUid = student.uid || 'Unknown UID';
+    const deviceUid = device_uid;
+    const originalSchool = otherSchool;
 
+    // Prepare email alert
     const emailTemplate = `
-  <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
-    <div style="background: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;">
-      <h2>Hello ${adminName},</h2>
-      <p><strong>Alert:</strong> A student from your school attempted to sign in at a different institution.</p>
-      <p>Here are the details:</p>
-      <ul style="padding-left: 20px;">
-        <li><strong>Student Name:</strong> ${studentName}</li>
-        <li><strong>Student UID:</strong> ${studentUid}</li>
-        <li><strong>Device UID:</strong> ${deviceUid}</li>
-        <li><strong>Original School:</strong> ${originalSchool}</li>
-      </ul>
-      <p style="color: red;"><strong>This may indicate unauthorized usage of student credentials.</strong></p>
-      <p>Please investigate or contact the admin of the device’s institution.</p>
-    </div>
-  </div>
-`;
-await transporter.sendMail({
-  from: '"Admin System" SYNCTUARIO',
-  to: adminEmail,
-  subject: "🚨 Student Cross-School Sign-in Alert",
-  html: emailTemplate,
-});
+      <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+        <div style="background: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;">
+          <h2>Hello ${adminName},</h2>
+          <p><strong>Alert:</strong> A student from your school attempted to sign in at a different institution.</p>
+          <p>Here are the details:</p>
+          <ul style="padding-left: 20px;">
+            <li><strong>Student Name:</strong> ${studentName}</li>
+            <li><strong>Student UID:</strong> ${studentUid}</li>
+            <li><strong>Device UID:</strong> ${deviceUid}</li>
+            <li><strong>Original School:</strong> ${originalSchool}</li>
+          </ul>
+          <p style="color: red;"><strong>This may indicate unauthorized usage of student credentials.</strong></p>
+          <p>Please investigate or contact the admin of the device’s institution.</p>
+        </div>
+      </div>
+    `;
 
+    await transporter.sendMail({
+      from: '"Admin System" <no-reply@synctuario.com>',
+      to: adminEmail,
+      subject: "🚨 Student Cross-School Sign-in Alert",
+      html: emailTemplate,
+    });
 
-
-
-
+    // Log and respond with mismatch info
     const mismatch = {
-       message:getMessage(lang, 'scan.mismatch',otherSchool),
-      student_uid: uid,
-      device_uid,
-      student_name: student.name,
+      message: getMessage(lang, 'scan.mismatch', otherSchool),
+      student_uid: studentUid,
+      device_uid: deviceUid,
+      student_name: studentName,
       sign: 0,
       timestamp: new Date(),
-      flag: getMessage(lang, 'scan.mismatch',otherSchool)
+      flag: getMessage(lang, 'scan.mismatch', otherSchool),
+    };
 
-    }
     console.log(`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`);
-      console.log(mismatch)
+    console.log(mismatch);
+
     return res.json(mismatch);
-   
   }
 } else {
   console.log("✅ API key matches or no conflict detected.");
