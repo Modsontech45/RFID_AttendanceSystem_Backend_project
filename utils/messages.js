@@ -56,7 +56,8 @@ const messages = {
   signedOut: 'Signed out',
   error: 'Error during scan processing',
   failed: 'Scan failed',
-  deviceRequired: 'device_uid is required'
+  deviceRequired: 'device_uid is required',
+  mismatch :`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`
 },
 students: {
   noApiKey: 'No API key found for user',
@@ -178,7 +179,8 @@ teacher: {
   signedOut: 'Déconnecté',
   error: 'Erreur lors du traitement du scan',
   failed: 'Échec du scan',
-  deviceRequired: 'device_uid est requis'
+  deviceRequired: 'device_uid est requis',
+   mismatch :`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`
 },
 students: {
   noApiKey: 'Aucune clé API trouvée pour cet utilisateur',
