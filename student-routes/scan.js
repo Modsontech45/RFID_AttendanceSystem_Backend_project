@@ -37,6 +37,24 @@ router.post('/', async (req, res) => {
     }
 
     const student = studentRes.rows[0];
+    const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
+
+// If student's api_key doesn't match the one in the request
+if (requestApiKey && requestApiKey !== student.api_key) {
+  const schoolRes = await pool.query('SELECT name FROM admins WHERE api_key = $1 LIMIT 1', [student.api_key]);
+
+  const otherSchool = schoolRes.rows[0]?.schoolname || 'another school';
+  return res.status(403).json({
+    message: `A student from "${otherSchool}" is trying to sign in to the wrong school.`,
+    student_uid: uid,
+    device_uid,
+    student_name: student.name,
+    sign: 0,
+    timestamp: now,
+    flag: 'Cross-school access attempt'
+  });
+}
+
     const dateStr = now.toISOString().slice(0, 10);
 
     // 2. Ensure daily attendance records exist
