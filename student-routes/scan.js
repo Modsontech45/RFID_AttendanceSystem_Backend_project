@@ -39,34 +39,50 @@ router.post('/', async (req, res) => {
     const student = studentRes.rows[0];
 const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
 
+console.log("🔐 Incoming request:");
+console.log("→ device_uid:", device_uid);
+console.log("→ uid:", uid);
+console.log("→ API key from request:", requestApiKey);
+console.log("→ Student's API key in database:", student.api_key);
+
+// If API keys don't match, investigate deeper
 if (requestApiKey && requestApiKey !== student.api_key) {
-  // Check if this UID exists in the current requester's school
+  console.log("⚠️ API key mismatch detected. Checking if UID belongs to the requesting school...");
+
+  // Check if UID exists under the requesting API key (same UID in different school)
   const sameUidSameSchool = await pool.query(
-    'SELECT name FROM users WHERE uid = $1 AND api_key = $2 LIMIT 1',
+    'SELECT * FROM students WHERE uid = $1 AND api_key = $2 LIMIT 1',
     [uid, requestApiKey]
   );
 
   if (sameUidSameSchool.rows.length > 0) {
-    // There’s a student with this UID in the correct school — treat that one instead
-    student = sameUidSameSchool.rows[0]; // override the previously fetched student
+    console.log("✅ UID found under the requesting API key. Proceeding with this student.");
+
+    // Override student to match the school associated with the current request
+    student = sameUidSameSchool.rows[0];
   } else {
-    // No match for UID in the current school — it's a cross-school access attempt
+    console.log("🚫 UID does not belong to the current school.");
+
     const schoolRes = await pool.query(
       'SELECT schoolname FROM admins WHERE api_key = $1 LIMIT 1',
       [student.api_key]
     );
-
     const otherSchool = schoolRes.rows[0]?.schoolname || 'another school';
+
+    console.log(`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`);
+
     return res.status(403).json({
       message: `A student from "${otherSchool}" is trying to sign in to the wrong school.`,
       student_uid: uid,
       device_uid,
       student_name: student.name,
       sign: 0,
-      timestamp: now,
+      timestamp: new Date(),
       flag: 'Cross-school access attempt'
     });
   }
+} else {
+  console.log("✅ API key matches or no conflict detected.");
 }
 
 
