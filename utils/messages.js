@@ -57,7 +57,8 @@ const messages = {
   error: 'Error during scan processing',
   failed: 'Scan failed',
   deviceRequired: 'device_uid is required',
-  mismatch :`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`
+  mismatch: (otherSchool) => 
+      `🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`
 },
 students: {
   noApiKey: 'No API key found for user',
@@ -180,7 +181,8 @@ teacher: {
   error: 'Erreur lors du traitement du scan',
   failed: 'Échec du scan',
   deviceRequired: 'device_uid est requis',
-   mismatch :`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`
+   mismatch: (otherSchool) => 
+      `🚨 Tentative d'accès croisée : un élève de "${otherSchool}" a tenté de se connecter à une autre école.`
 },
 students: {
   noApiKey: 'Aucune clé API trouvée pour cet utilisateur',
@@ -241,7 +243,17 @@ teacher: {
   }
 };
 
-module.exports = function getMessage(lang = 'en', key) {
+
+
+module.exports = function getMessage(lang = 'en', key, ...args) {
   const parts = key.split('.');
-  return parts.reduce((obj, part) => obj && obj[part], messages[lang]) || messages.en?.[key] || key;
+  const message = parts.reduce((obj, part) => obj && obj[part], messages[lang]) 
+                 || parts.reduce((obj, part) => obj && obj[part], messages.en);
+
+  // If message is a function, call it with the provided args
+  if (typeof message === 'function') {
+    return message(...args);
+  }
+
+  return message || key; // fallback to key name if not found
 };
