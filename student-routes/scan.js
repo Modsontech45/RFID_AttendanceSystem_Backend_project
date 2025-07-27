@@ -2,6 +2,16 @@ const express = require('express');
 const pool = require('../db');
 const router = express.Router();
 const getMessage = require('../utils/messages');
+const nodemailer = require("nodemailer");
+
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 const latestScans = {};
 
@@ -68,6 +78,37 @@ if (requestApiKey && requestApiKey !== student.api_key) {
       [student.api_key]
     );
     const otherSchool = schoolRes.rows[0]?.schoolname || 'another school';
+    const adminEmail = schoolRes.rows[0]?.email;
+    
+
+    const emailTemplate = `
+  <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+    <div style="background: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;">
+      <h2>Hello ${adminName},</h2>
+      <p><strong>Alert:</strong> A student from your school attempted to sign in at a different institution.</p>
+      <p>Here are the details:</p>
+      <ul style="padding-left: 20px;">
+        <li><strong>Student Name:</strong> ${studentName}</li>
+        <li><strong>Student UID:</strong> ${studentUid}</li>
+        <li><strong>Device UID:</strong> ${deviceUid}</li>
+        <li><strong>Original School:</strong> ${originalSchool}</li>
+      </ul>
+      <p style="color: red;"><strong>This may indicate unauthorized usage of student credentials.</strong></p>
+      <p>Please investigate or contact the admin of the device’s institution.</p>
+    </div>
+  </div>
+`;
+await transporter.sendMail({
+  from: '"Admin System" SYNCTUARIO',
+  to: adminEmail,
+  subject: "🚨 Student Cross-School Sign-in Alert",
+  html: emailTemplate,
+});
+
+
+
+
+
     const mismatch = {
        message:getMessage(lang, 'scan.mismatch',otherSchool),
       student_uid: uid,
