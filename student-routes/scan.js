@@ -39,17 +39,17 @@ router.post('/', async (req, res) => {
     const student = studentRes.rows[0];
 const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
 
-console.log("🔐 Incoming request:");
+console.log("🔐 Incoming scan request:");
 console.log("→ device_uid:", device_uid);
 console.log("→ uid:", uid);
 console.log("→ API key from request:", requestApiKey);
 console.log("→ Student's API key in database:", student.api_key);
 
-// If API keys don't match, investigate deeper
+// If API keys don't match
 if (requestApiKey && requestApiKey !== student.api_key) {
   console.log("⚠️ API key mismatch detected. Checking if UID belongs to the requesting school...");
 
-  // Check if UID exists under the requesting API key (same UID in different school)
+  // Check if same UID exists under requesting API key (i.e., different student with same UID in same school)
   const sameUidSameSchool = await pool.query(
     'SELECT * FROM students WHERE uid = $1 AND api_key = $2 LIMIT 1',
     [uid, requestApiKey]
@@ -57,35 +57,36 @@ if (requestApiKey && requestApiKey !== student.api_key) {
 
   if (sameUidSameSchool.rows.length > 0) {
     console.log("✅ UID found under the requesting API key. Proceeding with this student.");
-
-    // Override student to match the school associated with the current request
-    student = sameUidSameSchool.rows[0];
+    student = sameUidSameSchool.rows[0]; // Override student to correct one
   } else {
-    console.log("🚫 UID does not belong to the current school.");
-
+    // UID does not belong to the current school — send mismatch
     const schoolRes = await pool.query(
       'SELECT schoolname FROM admins WHERE api_key = $1 LIMIT 1',
       [student.api_key]
     );
     const otherSchool = schoolRes.rows[0]?.schoolname || 'another school';
+
     const mismatch = {
-       message:getMessage(lang, 'scan.mismatch',otherSchool),
+      message: getMessage(lang, 'scan.mismatch', otherSchool),
       student_uid: uid,
-      device_uid,
       student_name: student.name,
+      device_uid,
       sign: 0,
       timestamp: new Date(),
-      flag: getMessage(lang, 'scan.mismatch',otherSchool)
+      flag: getMessage(lang, 'scan.mismatch', otherSchool)
+    };
 
-    }
     console.log(`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`);
-      console.log(mismatch)
-    return res.json(mismatch);
-   
+    console.log("🔁 Mismatch data sent to frontend:", mismatch);
+
+    return res.json(mismatch); // Frontend will log this with student_uid
   }
-} else {
-  console.log("✅ API key matches or no conflict detected.");
 }
+
+console.log("✅ API key matches or override applied. Proceeding with student:", student.name);
+
+// Proceed with normal attendance marking or whatever your next steps are...
+// return res.json(validScanData)
 
 
     const dateStr = now.toISOString().slice(0, 10);
