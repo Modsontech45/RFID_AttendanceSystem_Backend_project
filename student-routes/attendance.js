@@ -7,7 +7,7 @@ const getMessage = require("../utils/messages");
 const { checkSubscription } = require("../middleware/auth");
 
 // GET attendance records filtered by API key
-router.get("/",cacheMiddleware, verifyApiKey, async (req, res) => {
+router.get("/", verifyApiKey, async (req, res) => {
   const lang =
     req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
   const admin = req.admin;
