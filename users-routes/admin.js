@@ -29,12 +29,12 @@ if (!process.env.JWT_SECRET) {
 
 // ✅ Admin Signup
 router.post("/signup", async (req, res) => {
-  const { schoolname, username, email, password } = req.body;
+  const { schoolname, username, email, password, type } = req.body;
   const lang =
     req.headers["accept-language"]?.toLowerCase().split(",")[0] || "en";
 
   // Validate required fields
-  if (!schoolname || !username || !email || !password) {
+  if (!schoolname || !username || !email || !password || !type) {
     return res
       .status(400)
       .json({ message: getMessage(lang, "admin.requiredFields") });
@@ -58,9 +58,9 @@ router.post("/signup", async (req, res) => {
 
     // Insert new admin
     const result = await pool.query(
-      `INSERT INTO admins (schoolname, username, email, password, api_key, verified, verification_token)
-       VALUES ($1, $2, $3, $4, $5, false, $6) RETURNING *`,
-      [schoolname, username, email, hashedPassword, apiKey, verificationToken]
+      `INSERT INTO admins (schoolname, username, email, password, api_key, verified, verification_token, type)
+       VALUES ($1, $2, $3, $4, $5, false, $6, $7) RETURNING *`,
+      [schoolname, username, email, hashedPassword, apiKey, verificationToken, type]
     );
 
     // Create verification link
@@ -101,14 +101,13 @@ router.post("/signup", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Signup error:", err.message);
-    res
-      .status(500)
-      .json({
-        message: getMessage(lang, "common.internalError"),
-        error: err.message,
-      });
+    res.status(500).json({
+      message: getMessage(lang, "common.internalError"),
+      error: err.message,
+    });
   }
 });
+
 
 // ✅ Email Verification
 router.get("/verify/:token", async (req, res) => {
@@ -187,7 +186,7 @@ router.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: admin.id, role: admin.role },
+      { id: admin.id, role: admin.role, type: admin.type },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
@@ -234,10 +233,11 @@ router.post("/login", async (req, res) => {
         username: admin.username,
         email: admin.email,
         role: admin.role,
+        type: admin.type,   // ✅ now included
         api_key: apiKey,
         created_at: admin.created_at,
-        subscription_status: admin.subscription_status || 'inactive',
-        subscription_plan: admin.subscription_plan || 'free',
+        subscription_status: admin.subscription_status || "inactive",
+        subscription_plan: admin.subscription_plan || "free",
         subscription_start_date: admin.subscription_start_date || null,
         subscription_end_date: admin.subscription_end_date || null,
         trial_end_date: admin.trial_end_date || null,
