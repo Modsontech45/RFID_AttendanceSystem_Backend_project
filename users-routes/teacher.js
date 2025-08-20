@@ -88,7 +88,8 @@ router.post("/login", async (req, res) => {
     const adminData = {
       id: admin.id,
       schoolname: admin.schoolname,
-      username: admin.username
+      username: admin.username,
+      typeof: admin.type,
     };
 
     // 🪵 Log admin data for debug
