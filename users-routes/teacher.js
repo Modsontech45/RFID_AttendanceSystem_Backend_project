@@ -89,7 +89,7 @@ router.post("/login", async (req, res) => {
       id: admin.id,
       schoolname: admin.schoolname,
       username: admin.username,
-      typeof: admin.type,
+      type: admin.type,
     };
 
     // 🪵 Log admin data for debug
