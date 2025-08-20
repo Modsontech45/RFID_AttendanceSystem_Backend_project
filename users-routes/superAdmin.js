@@ -21,7 +21,7 @@ const transporter = nodemailer.createTransport({
 // ================== Middleware ==================
 function requireSuperAdmin(req, res, next) {
   if (req.superAdmin?.role !== "super_admin") {
-    return res.status(403).json({ message: "Access denied: Super Admins only" });
+    return res.status(403).json({ success: false, message: "Access denied: Super Admins only" });
   }
   next();
 }
@@ -30,25 +30,26 @@ function requireSuperAdmin(req, res, next) {
 router.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password)
-    return res.status(400).json({ message: "All fields are required" });
+    return res.status(400).json({ success: false, message: "All fields are required" });
 
   try {
     const countResult = await pool.query("SELECT COUNT(*) FROM super_admins");
     const count = parseInt(countResult.rows[0].count);
 
-    if (count >= 3) return res.status(400).json({ message: "Only 3 super admins allowed" });
+    if (count >= 3) return res.status(400).json({ success: false, message: "Only 3 super admins allowed" });
 
     // Require auth if not first super-admin
     if (count > 0) {
       if (!req.headers.authorization)
-        return res.status(401).json({ message: "Authorization required" });
+        return res.status(401).json({ success: false, message: "Authorization required" });
+
       try {
         const token = req.headers.authorization.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         if (decoded.role !== "super_admin")
-          return res.status(403).json({ message: "Only a super-admin can add another" });
+          return res.status(403).json({ success: false, message: "Only a super-admin can add another" });
       } catch (err) {
-        return res.status(401).json({ message: "Invalid token" });
+        return res.status(401).json({ success: false, message: "Invalid token" });
       }
     }
 
@@ -72,78 +73,59 @@ router.post("/signup", async (req, res) => {
              <a href="${verifyLink}" target="_blank">${verifyLink}</a>`,
     });
 
-    res.status(201).json({
-      message: "Super Admin registered successfully. Please verify your email.",
-      superAdmin: insertResult.rows[0],
-    });
+    res.status(201).json({ success: true, message: "Super Admin registered. Please verify your email.", superAdmin: insertResult.rows[0] });
   } catch (err) {
     console.error("❌ Error signing up super admin:", err.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
 // ================== Super Admin Login ==================
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ message: "Email and password required" });
+  if (!email || !password) return res.status(400).json({ success: false, message: "Email and password required" });
 
   try {
     const result = await pool.query("SELECT * FROM super_admins WHERE email = $1", [email]);
     const superAdmin = result.rows[0];
 
-    if (!superAdmin) return res.status(401).json({ message: "Invalid credentials" });
-    if (!superAdmin.verified) return res.status(403).json({ message: "Verify your email first" });
+    if (!superAdmin) return res.status(401).json({ success: false, message: "Invalid credentials" });
+    if (!superAdmin.verified) return res.status(403).json({ success: false, message: "Please verify your email first" });
 
     const match = await bcrypt.compare(password, superAdmin.password);
-    if (!match) return res.status(401).json({ message: "Invalid credentials" });
+    if (!match) return res.status(401).json({ success: false, message: "Invalid credentials" });
 
-    const token = jwt.sign({ id: superAdmin.id, role: "super_admin" }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
-    });
+    const token = jwt.sign({ id: superAdmin.id, role: "super_admin" }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
-    res.json({
-      message: "Super Admin login successful",
-      token,
-      superAdmin: { id: superAdmin.id, email: superAdmin.email, username: superAdmin.username },
-    });
+    res.json({ success: true, message: "Login successful", token, superAdmin: { id: superAdmin.id, email: superAdmin.email, username: superAdmin.username } });
   } catch (err) {
     console.error("❌ Super Admin login error:", err.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
 // ================== Request Password Reset ==================
 router.post("/request-password-reset", async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ message: "Email is required" });
+  if (!email) return res.status(400).json({ success: false, message: "Email is required" });
 
   try {
     const result = await pool.query("SELECT * FROM super_admins WHERE email = $1", [email]);
     const superAdmin = result.rows[0];
-    if (!superAdmin) return res.status(404).json({ message: "Super Admin not found" });
+    if (!superAdmin) return res.status(404).json({ success: false, message: "Super Admin not found" });
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetExpiry = new Date(Date.now() + 1000 * 60 * 30); // 30 min
 
-    await pool.query(
-      "UPDATE super_admins SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3",
-      [resetToken, resetExpiry, superAdmin.id]
-    );
+    await pool.query("UPDATE super_admins SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3", [resetToken, resetExpiry, superAdmin.id]);
 
     const resetLink = `https://rfid-attendance-synctuario-theta.vercel.app/super-admin/reset-password?token=${resetToken}`;
-    await transporter.sendMail({
-      from: `"System" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Super Admin Password Reset",
-      html: `<p>Click the link below to reset your password:</p>
-             <a href="${resetLink}" target="_blank">${resetLink}</a>
-             <p>This link will expire in 30 minutes.</p>`,
-    });
+    await transporter.sendMail({ from: `"System" <${process.env.EMAIL_USER}>`, to: email, subject: "Password Reset", html: `<p>Click to reset your password:</p><a href="${resetLink}">${resetLink}</a>` });
 
-    res.json({ message: "Password reset email sent" });
+    res.json({ success: true, message: "Password reset email sent" });
   } catch (err) {
     console.error("❌ Error requesting password reset:", err.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
@@ -151,26 +133,20 @@ router.post("/request-password-reset", async (req, res) => {
 router.post("/reset-password/:token", async (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
-  if (!password) return res.status(400).json({ message: "Password is required" });
+  if (!password) return res.status(400).json({ success: false, message: "Password is required" });
 
   try {
-    const result = await pool.query(
-      "SELECT * FROM super_admins WHERE reset_token = $1 AND reset_token_expiry > NOW()",
-      [token]
-    );
+    const result = await pool.query("SELECT * FROM super_admins WHERE reset_token = $1 AND reset_token_expiry > NOW()", [token]);
     const superAdmin = result.rows[0];
-    if (!superAdmin) return res.status(400).json({ message: "Invalid or expired token" });
+    if (!superAdmin) return res.status(400).json({ success: false, message: "Invalid or expired token" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query(
-      "UPDATE super_admins SET password = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2",
-      [hashedPassword, superAdmin.id]
-    );
+    await pool.query("UPDATE super_admins SET password = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2", [hashedPassword, superAdmin.id]);
 
-    res.json({ message: "Password has been reset successfully" });
+    res.json({ success: true, message: "Password has been reset successfully" });
   } catch (err) {
     console.error("❌ Error resetting password:", err.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
@@ -178,17 +154,15 @@ router.post("/reset-password/:token", async (req, res) => {
 router.get("/verify/:token", async (req, res) => {
   const { token } = req.params;
   try {
-    const result = await pool.query(
-      "UPDATE super_admins SET verified = true, verification_token = NULL WHERE verification_token = $1 RETURNING *",
-      [token]
-    );
-    if (result.rowCount === 0) return res.status(400).json({ message: "Invalid or expired token" });
-    res.json({ message: "Email verified successfully" });
+    const result = await pool.query("UPDATE super_admins SET verified = true, verification_token = NULL WHERE verification_token = $1 RETURNING *", [token]);
+    if (result.rowCount === 0) return res.status(400).json({ success: false, message: "Invalid or expired token" });
+    res.json({ success: true, message: "Email verified successfully", superAdmin: result.rows[0] });
   } catch (err) {
     console.error("❌ Error verifying email:", err.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
+
 
 // ================== Fetch All Users ==================
 router.get("/admins", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
