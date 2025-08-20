@@ -1,27 +1,30 @@
-const jwt = require('jsonwebtoken');
-const getMessage = require('../utils/messages');
-require('dotenv').config();
+const jwt = require("jsonwebtoken");
+const getMessage = require("../utils/messages");
+require("dotenv").config();
 
+/**
+ * 🔹 Middleware: Authenticate Admin
+ */
 const authenticateAdmin = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  const lang = req.headers['accept-language'] || 'en';
+  const lang = req.headers["accept-language"] || "en";
 
   if (!authHeader)
-    return res.status(401).json({ message: getMessage(lang, 'auth.noToken') });
+    return res.status(401).json({ message: getMessage(lang, "auth.noToken") });
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
 
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
-      console.log('Admin JWT verification error:', err);
-      return res.status(403).json({ message: getMessage(lang, 'auth.invalidToken') });
+      console.log("Admin JWT verification error:", err);
+      return res.status(403).json({ message: getMessage(lang, "auth.invalidToken") });
     }
 
-    console.log('Admin decoded token:', decoded);
+    console.log("Admin decoded token:", decoded);
 
-    if (decoded.role !== 'admin') {
-      console.log('Access denied: role is not admin:', decoded.role);
-      return res.status(403).json({ message: getMessage(lang, 'auth.accessDenied') });
+    if (decoded.role !== "admin") {
+      console.log("Access denied: role is not admin:", decoded.role);
+      return res.status(403).json({ message: getMessage(lang, "auth.accessDenied") });
     }
 
     req.admin = decoded;
@@ -29,26 +32,29 @@ const authenticateAdmin = (req, res, next) => {
   });
 };
 
+/**
+ * 🔹 Middleware: Authenticate Teacher
+ */
 const authenticateTeacher = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  const lang = req.headers['accept-language'] || 'en';
+  const lang = req.headers["accept-language"] || "en";
 
   if (!authHeader)
-    return res.status(401).json({ message: getMessage(lang, 'auth.noToken') });
+    return res.status(401).json({ message: getMessage(lang, "auth.noToken") });
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
 
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
-      console.log('Teacher JWT verification error:', err);
-      return res.status(403).json({ message: getMessage(lang, 'auth.invalidToken') });
+      console.log("Teacher JWT verification error:", err);
+      return res.status(403).json({ message: getMessage(lang, "auth.invalidToken") });
     }
 
-    console.log('Teacher decoded token:', decoded);
+    console.log("Teacher decoded token:", decoded);
 
-    if (!decoded || decoded.role !== 'teacher') {
-      console.log('Access denied: role is not teacher:', decoded ? decoded.role : decoded);
-      return res.status(403).json({ message: getMessage(lang, 'auth.accessDenied') });
+    if (!decoded || decoded.role !== "teacher") {
+      console.log("Access denied: role is not teacher:", decoded ? decoded.role : decoded);
+      return res.status(403).json({ message: getMessage(lang, "auth.accessDenied") });
     }
 
     req.teacher = decoded;
@@ -56,6 +62,39 @@ const authenticateTeacher = (req, res, next) => {
   });
 };
 
+/**
+ * 🔹 Middleware: Authenticate Super Admin
+ */
+const authenticateSuperAdmin = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const lang = req.headers["accept-language"] || "en";
+
+  if (!authHeader)
+    return res.status(401).json({ message: getMessage(lang, "auth.noToken") });
+
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      console.log("Super Admin JWT verification error:", err);
+      return res.status(403).json({ message: getMessage(lang, "auth.invalidToken") });
+    }
+
+    console.log("Super Admin decoded token:", decoded);
+
+    if (!decoded || decoded.role !== "super_admin") {
+      console.log("Access denied: role is not super_admin:", decoded ? decoded.role : decoded);
+      return res.status(403).json({ message: getMessage(lang, "auth.accessDenied") });
+    }
+
+    req.superAdmin = decoded;
+    next();
+  });
+};
+
+/**
+ * 🔹 Subscription Checker
+ */
 async function checkSubscription(admin) {
   const now = new Date();
   console.log("🕒 Current time:", now);
@@ -69,7 +108,7 @@ async function checkSubscription(admin) {
       return "expired";
     }
     console.log("✅ Trial active");
-    return "trial";  // Return "trial" if still in trial period
+    return "trial";
   }
 
   if (admin.subscription_status === "active") {
@@ -80,19 +119,16 @@ async function checkSubscription(admin) {
       return "expired";
     }
     console.log("✅ Subscription active");
-    return "active"; // Return "active" if subscription is still valid
+    return "active";
   }
 
   console.log("❓ No subscription found");
   return "none";
 }
 
-
-
-
 module.exports = {
   authenticateAdmin,
   authenticateTeacher,
+  authenticateSuperAdmin, // ✅ new export
   checkSubscription,
-  
 };

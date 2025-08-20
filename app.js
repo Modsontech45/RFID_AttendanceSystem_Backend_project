@@ -10,6 +10,7 @@ const deviceRoutes = require('./devices/registerdevice'); // adjust path as need
 const categoryRoutes = require('./category/categories');
 const timeSettingsRouter = require('./student-routes/timeSettings');
 const paymentRoutes = require('./users-routes/paystack');
+const superAdmin = require('./users-routes/superAdmin')
 
 
 
@@ -60,6 +61,7 @@ app.use('/api/teachers', teacherRoutes);
 app.use('/api/reset', resetPasswordRoutes);
 app.use('/api', timeSettingsRouter);
 app.use('/api/', paymentRoutes);
+app.use('/api/super-admin', superAdmin);
 
 
 app.use('/api/students', require('./student-routes/students'));
