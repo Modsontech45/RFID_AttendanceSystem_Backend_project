@@ -63,7 +63,7 @@ router.post("/signup", async (req, res) => {
       [username, email, hashedPassword, verificationToken]
     );
 
-    const verifyLink = `https://rfid-attendance-synctuario-theta.vercel.app/super-admin/verify/${verificationToken}`;
+    const verifyLink = `http://localhost:5173/super-admin/verify/${verificationToken}`;
     await transporter.sendMail({
       from: `"System" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -119,7 +119,7 @@ router.post("/request-password-reset", async (req, res) => {
 
     await pool.query("UPDATE super_admins SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3", [resetToken, resetExpiry, superAdmin.id]);
 
-    const resetLink = `https://rfid-attendance-synctuario-theta.vercel.app/super-admin/reset-password?token=${resetToken}`;
+    const resetLink = `http://localhost:5173/super-admin/reset-password?token=${resetToken}`;
     await transporter.sendMail({ from: `"System" <${process.env.EMAIL_USER}>`, to: email, subject: "Password Reset", html: `<p>Click to reset your password:</p><a href="${resetLink}">${resetLink}</a>` });
 
     res.json({ success: true, message: "Password reset email sent" });
