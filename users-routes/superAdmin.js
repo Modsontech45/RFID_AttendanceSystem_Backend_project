@@ -163,128 +163,172 @@ router.get("/verify/:token", async (req, res) => {
   }
 });
 
-
 // ================== Fetch All Users ==================
 router.get("/admins", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
   try {
     const result = await pool.query("SELECT id, username, email, schoolname, type, active, created_at FROM admins");
-    res.json(result.rows);
+    res.json({ success: true, admins: result.rows });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("❌ Fetch admins error:", err.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
 router.get("/teachers", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
   try {
     const result = await pool.query("SELECT id, name, email, school_id, active, created_at FROM teachers");
-    res.json(result.rows);
+    res.json({ success: true, teachers: result.rows });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("❌ Fetch teachers error:", err.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
 router.get("/students", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
   try {
     const result = await pool.query("SELECT id, name, email, class, school_id, active, created_at FROM students");
-    res.json(result.rows);
+    res.json({ success: true, students: result.rows });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("❌ Fetch students error:", err.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
 // ================== Manage Users ==================
-router.patch("/admins/:id/status", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { action } = req.body;
-
-  try {
-    if (action === "deactivate") await pool.query("UPDATE admins SET active = false WHERE id = $1", [id]);
-    else if (action === "activate") await pool.query("UPDATE admins SET active = true WHERE id = $1", [id]);
-    else if (action === "delete") await pool.query("DELETE FROM admins WHERE id = $1", [id]);
-    else return res.status(400).json({ message: "Invalid action" });
-
-    res.json({ message: `Admin ${action} successful` });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+async function updateUserStatus(table, id, action) {
+  switch (action) {
+    case "deactivate": await pool.query(`UPDATE ${table} SET active = false WHERE id = $1`, [id]); break;
+    case "activate": await pool.query(`UPDATE ${table} SET active = true WHERE id = $1`, [id]); break;
+    case "delete": await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]); break;
+    default: throw new Error("Invalid action");
   }
+}
+
+["admins", "teachers", "students"].forEach(table => {
+  router.patch(`/${table}/:id/status`, authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { action } = req.body;
+
+    try {
+      await updateUserStatus(table, id, action);
+      res.json({ success: true, message: `${table.slice(0,-1)} ${action} successful` });
+    } catch (err) {
+      console.error(`❌ Manage ${table} error:`, err.message);
+      res.status(err.message === "Invalid action" ? 400 : 500).json({ success: false, message: err.message });
+    }
+  });
 });
 
 // ================== Send Emails / Broadcast ==================
 router.post("/send-email", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
-  const { toGroup, subject, body } = req.body; // toGroup: "all", "admins", "teachers", "students", "school:<schoolname>"
-  if (!toGroup || !subject || !body) return res.status(400).json({ message: "All fields required" });
+  const { toGroup, subject, body } = req.body;
+  if (!toGroup || !subject || !body) return res.status(400).json({ success: false, message: "All fields required" });
 
   try {
     let recipientsQuery = "";
+    let queryParams = [];
+
     switch (toGroup) {
-      case "all": recipientsQuery = "SELECT email FROM admins UNION SELECT email FROM teachers UNION SELECT email FROM students"; break;
-      case "admins": recipientsQuery = "SELECT email FROM admins"; break;
-      case "teachers": recipientsQuery = "SELECT email FROM teachers"; break;
-      case "students": recipientsQuery = "SELECT email FROM students"; break;
+      case "all":
+        recipientsQuery = "SELECT email FROM admins UNION SELECT email FROM teachers UNION SELECT email FROM students";
+        break;
+      case "admins":
+      case "teachers":
+      case "students":
+        recipientsQuery = `SELECT email FROM ${toGroup}`;
+        break;
       default:
         if (toGroup.startsWith("school:")) {
           const schoolname = toGroup.split(":")[1];
-          recipientsQuery = `SELECT email FROM admins WHERE schoolname=$1 UNION SELECT email FROM teachers WHERE school_id IN (SELECT id FROM admins WHERE schoolname=$1) UNION SELECT email FROM students WHERE school_id IN (SELECT id FROM admins WHERE schoolname=$1)`;
+          recipientsQuery = `
+            SELECT email FROM admins WHERE schoolname=$1
+            UNION
+            SELECT email FROM teachers WHERE school_id IN (SELECT id FROM admins WHERE schoolname=$1)
+            UNION
+            SELECT email FROM students WHERE school_id IN (SELECT id FROM admins WHERE schoolname=$1)
+          `;
+          queryParams = [schoolname];
         }
+        break;
     }
 
-    let recipients = [];
-    if (toGroup.startsWith("school:")) {
-      const schoolname = toGroup.split(":")[1];
-      const result = await pool.query(recipientsQuery, [schoolname]);
-      recipients = result.rows.map(r => r.email);
-    } else {
-      const result = await pool.query(recipientsQuery);
-      recipients = result.rows.map(r => r.email);
-    }
+    const result = await pool.query(recipientsQuery, queryParams);
+    const recipients = result.rows.map(r => r.email);
 
     for (const email of recipients) {
       await transporter.sendMail({ from: process.env.EMAIL_USER, to: email, subject, html: body });
     }
 
     await pool.query("INSERT INTO emails_logs (to_group, subject, body) VALUES ($1, $2, $3)", [toGroup, subject, body]);
-    res.json({ message: "Emails sent successfully" });
+
+    res.json({ success: true, message: "Emails sent successfully", sentTo: recipients.length });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("❌ Send emails error:", err.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
 // ================== Ads Management ==================
 router.post("/ads", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
   const { title, body, targetGroup } = req.body;
-  if (!title || !body || !targetGroup) return res.status(400).json({ message: "All fields required" });
+  if (!title || !body || !targetGroup) return res.status(400).json({ success: false, message: "All fields required" });
 
   try {
-    await pool.query("INSERT INTO ads (title, body, target_group) VALUES ($1, $2, $3)", [title, body, targetGroup]);
-    res.json({ message: "Ad created successfully" });
+    const result = await pool.query("INSERT INTO ads (title, body, target_group) VALUES ($1, $2, $3) RETURNING *", [title, body, targetGroup]);
+    res.json({ success: true, message: "Ad created successfully", ad: result.rows[0] });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("❌ Ads creation error:", err.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+});
+
+router.get("/ads", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM ads ORDER BY created_at DESC");
+    res.json({ success: true, ads: result.rows });
+  } catch (err) {
+    console.error("❌ Fetch ads error:", err.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+});
+
+router.delete("/ads/:id", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query("DELETE FROM ads WHERE id=$1", [id]);
+    res.json({ success: true, message: "Ad deleted successfully" });
+  } catch (err) {
+    console.error("❌ Delete ad error:", err.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
 // ================== System Statistics ==================
 router.get("/stats", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
   try {
-    const admins = await pool.query("SELECT COUNT(*) FROM admins");
-    const teachers = await pool.query("SELECT COUNT(*) FROM teachers");
-    const students = await pool.query("SELECT COUNT(*) FROM students");
-    const superAdmins = await pool.query("SELECT COUNT(*) FROM super_admins");
+    const [admins, teachers, students, superAdmins, ads, emails] = await Promise.all([
+      pool.query("SELECT COUNT(*) FROM admins"),
+      pool.query("SELECT COUNT(*) FROM teachers"),
+      pool.query("SELECT COUNT(*) FROM students"),
+      pool.query("SELECT COUNT(*) FROM super_admins"),
+      pool.query("SELECT COUNT(*) FROM ads"),
+      pool.query("SELECT COUNT(*) FROM emails_logs"),
+    ]);
 
     res.json({
-      totalAdmins: admins.rows[0].count,
-      totalTeachers: teachers.rows[0].count,
-      totalStudents: students.rows[0].count,
-      totalSuperAdmins: superAdmins.rows[0].count
+      success: true,
+      stats: {
+        totalAdmins: admins.rows[0].count,
+        totalTeachers: teachers.rows[0].count,
+        totalStudents: students.rows[0].count,
+        totalSuperAdmins: superAdmins.rows[0].count,
+        totalAds: ads.rows[0].count,
+        totalEmails: emails.rows[0].count,
+      },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("❌ Stats error:", err.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
 
