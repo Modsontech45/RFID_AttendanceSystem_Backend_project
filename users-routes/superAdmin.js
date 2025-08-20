@@ -83,23 +83,53 @@ router.post("/signup", async (req, res) => {
 // ================== Super Admin Login ==================
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ success: false, message: "Email and password required" });
+
+  // Check for missing fields
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: "Email and password are required" });
+  }
 
   try {
+    // Fetch super-admin by email
     const result = await pool.query("SELECT * FROM super_admins WHERE email = $1", [email]);
     const superAdmin = result.rows[0];
 
-    if (!superAdmin) return res.status(401).json({ success: false, message: "Invalid credentials" });
-    if (!superAdmin.verified) return res.status(403).json({ success: false, message: "Please verify your email first" });
+    // Email not found
+    if (!superAdmin) {
+      return res.status(401).json({ success: false, message: "Invalid credentials: email not found" });
+    }
 
-    const match = await bcrypt.compare(password, superAdmin.password);
-    if (!match) return res.status(401).json({ success: false, message: "Invalid credentials" });
+    // Email not verified
+    if (!superAdmin.verified) {
+      return res.status(403).json({ success: false, message: "Email not verified. Please check your inbox." });
+    }
 
-    const token = jwt.sign({ id: superAdmin.id, role: "super_admin" }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    // Compare password
+    const isMatch = await bcrypt.compare(password, superAdmin.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: "Invalid credentials: wrong password" });
+    }
 
-    res.json({ success: true, message: "Login successful", token, superAdmin: { id: superAdmin.id, email: superAdmin.email, username: superAdmin.username } });
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: superAdmin.id, role: "super_admin" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    // Success response
+    res.json({
+      success: true,
+      message: "Super Admin login successful",
+      token,
+      superAdmin: {
+        id: superAdmin.id,
+        username: superAdmin.username,
+        email: superAdmin.email,
+      },
+    });
   } catch (err) {
-    console.error("❌ Super Admin login error:", err.message);
+    console.error("❌ Super Admin login error:", err);
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 });
