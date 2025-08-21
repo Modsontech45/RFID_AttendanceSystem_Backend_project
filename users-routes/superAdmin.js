@@ -188,61 +188,28 @@ router.get("/admins", authenticateSuperAdmin, requireSuperAdmin, async (req, res
   }
 });
 
-router.get("/students", async (req, res) => {
-  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
-
+router.get("/teachers", async (req, res) => {
   try {
-    const requesterApiKey = req.user.api_key;
-     const subStatus = await checkSubscription(req.user);
-    if (subStatus === "expired") {
-      return res.status(403).json({ 
-        message: "Subscription expired. Please renew.",
-        redirectTo: "https://rfid-attendance-synctuario-theta.vercel.app/pricing",
-        subscriptionExpired: true
-      });
-    }
-
-    if (!requesterApiKey) {
-      return res.status(403).json({ message: getMessage(lang, 'students.noApiKey') });
-    }
-
-    const studentsResult = await pool.query(
-      "SELECT * FROM students WHERE api_key = $1",
-      [requesterApiKey]
-    );
-
-    if (studentsResult.rows.length === 0) {
-      return res.status(403).json({ message: getMessage(lang, 'students.noStudentsFound') });
-    }
-
-    res.status(200).json(studentsResult.rows);
-
-  } catch (err) {
-    console.error("Error fetching students:", err);
-    res.status(500).json({ error: getMessage(lang, 'common.internalError') });
-  }
-});
-
-
-router.get("/teachers",  async (req, res) => {
-  const requester = req.user;
-  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
-
-  if (requester.role !== "admin") {
-    return res.status(403).json({ message: getMessage(lang, 'teacher.adminOnly') });
-  }
-
-  try {
-    const result = await pool.query(
-      `SELECT * FROM teachers WHERE added_by = $1 AND api_key = $2 ORDER BY created_at DESC`,
-      [requester.id, requester.api_key]
-    );
-    res.status(200).json({ teachers: result.rows });
+    const teachersResult = await pool.query("SELECT * FROM teachers ORDER BY created_at DESC");
+    res.status(200).json({ teachers: teachersResult.rows });
   } catch (err) {
     console.error("Error fetching teachers:", err);
-    res.status(500).json({ message: getMessage(lang, 'common.internalError') });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+
+router.get("/students", async (req, res) => {
+  try {
+    const studentsResult = await pool.query("SELECT * FROM students ORDER BY created_at DESC");
+    res.status(200).json(studentsResult.rows);
+  } catch (err) {
+    console.error("Error fetching students:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
 
 
 // ================== Manage Users ==================
