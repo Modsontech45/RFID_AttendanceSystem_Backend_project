@@ -201,7 +201,7 @@ router.get("/teachers", async (req, res) => {
 
 router.get("/students", async (req, res) => {
   try {
-    const studentsResult = await pool.query("SELECT * FROM students ORDER BY created_at DESC");
+    const studentsResult = await pool.query("SELECT * FROM students ORDER BY id DESC");
     res.status(200).json(studentsResult.rows);
   } catch (err) {
     console.error("Error fetching students:", err);
