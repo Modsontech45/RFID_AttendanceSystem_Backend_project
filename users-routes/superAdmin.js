@@ -188,25 +188,62 @@ router.get("/admins", authenticateSuperAdmin, requireSuperAdmin, async (req, res
   }
 });
 
-router.get("/teachers", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
+router.get("/students", async (req, res) => {
+  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+
   try {
-    const result = await pool.query("SELECT id, name, email, school_id, active, created_at FROM teachers");
-    sendResponse(res, 200, { success: true, teachers: result.rows });
+    const requesterApiKey = req.user.api_key;
+     const subStatus = await checkSubscription(req.user);
+    if (subStatus === "expired") {
+      return res.status(403).json({ 
+        message: "Subscription expired. Please renew.",
+        redirectTo: "https://rfid-attendance-synctuario-theta.vercel.app/pricing",
+        subscriptionExpired: true
+      });
+    }
+
+    if (!requesterApiKey) {
+      return res.status(403).json({ message: getMessage(lang, 'students.noApiKey') });
+    }
+
+    const studentsResult = await pool.query(
+      "SELECT * FROM students WHERE api_key = $1",
+      [requesterApiKey]
+    );
+
+    if (studentsResult.rows.length === 0) {
+      return res.status(403).json({ message: getMessage(lang, 'students.noStudentsFound') });
+    }
+
+    res.status(200).json(studentsResult.rows);
+
   } catch (err) {
-    console.error("❌ Fetch teachers error:", err.message);
-    sendResponse(res, 500, { success: false, message: "Internal Server Error" });
+    console.error("Error fetching students:", err);
+    res.status(500).json({ error: getMessage(lang, 'common.internalError') });
   }
 });
 
-router.get("/students", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
+
+router.get("/teachers",  async (req, res) => {
+  const requester = req.user;
+  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+
+  if (requester.role !== "admin") {
+    return res.status(403).json({ message: getMessage(lang, 'teacher.adminOnly') });
+  }
+
   try {
-    const result = await pool.query("SELECT id, name, email, class, school_id, active, created_at FROM students");
-    sendResponse(res, 200, { success: true, students: result.rows });
+    const result = await pool.query(
+      `SELECT * FROM teachers WHERE added_by = $1 AND api_key = $2 ORDER BY created_at DESC`,
+      [requester.id, requester.api_key]
+    );
+    res.status(200).json({ teachers: result.rows });
   } catch (err) {
-    console.error("❌ Fetch students error:", err.message);
-    sendResponse(res, 500, { success: false, message: "Internal Server Error" });
+    console.error("Error fetching teachers:", err);
+    res.status(500).json({ message: getMessage(lang, 'common.internalError') });
   }
 });
+
 
 // ================== Manage Users ==================
 async function updateUserStatus(table, id, action) {
