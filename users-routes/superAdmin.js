@@ -180,7 +180,7 @@ router.get("/verify/:token", async (req, res) => {
 // ================== Fetch Users ==================
 router.get("/admins", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, username, email, schoolname, type, active, created_at FROM admins");
+    const result = await pool.query("SELECT id, username, email, schoolname, type, active, api_key, created_at FROM admins");
     sendResponse(res, 200, { success: true, admins: result.rows });
   } catch (err) {
     console.error("❌ Fetch admins error:", err.message);
