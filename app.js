@@ -29,7 +29,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://192.168.1.142:3000',
   'https://rfid-attendance-synctuario-theta.vercel.app',
-  'https://super-admin-8wpz7se3l-modsons-projects.vercel.app',
+  'https://super-admin-drab.vercel.app',
   'https://rfid-attendancesystem-backend-project.onrender.com',
   'https://zp1v56uxy8rdx5ypatb0ockcb9tr6a-oci3--5173--96435430.local-credentialless.webcontainer-api.io',
    // ✅ ADD THIS
