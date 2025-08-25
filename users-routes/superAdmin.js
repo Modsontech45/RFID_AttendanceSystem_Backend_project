@@ -166,7 +166,7 @@ router.post("/request-password-reset", async (req, res) => {
     logQuery(updateQuery, [resetToken, resetExpiry, superAdmin.id]);
     await pool.query(updateQuery, [resetToken, resetExpiry, superAdmin.id]);
 
-    const resetLink = `http://localhost:5173/super-admin/reset-password?token=${resetToken}`;
+    const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
     await transporter.sendMail({ 
       from: `"System" <${process.env.EMAIL_USER}>`, 
       to: email, 
