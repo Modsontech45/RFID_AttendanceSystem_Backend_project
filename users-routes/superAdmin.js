@@ -9,9 +9,30 @@ const { authenticateSuperAdmin } = require("../middleware/auth");
 require("dotenv").config();
 const router = express.Router();
 
-// ================== Helper: Log & send response ==================
-function sendResponse(res, status, payload) {
-  console.log("Response:", payload);
+// ================== Logger Helpers ==================
+function logRequest(req) {
+  console.log("🟢 Incoming Request:");
+  console.log("➡️ Route:", req.method, req.originalUrl);
+  console.log("➡️ Body:", JSON.stringify(req.body));
+  console.log("➡️ Query:", JSON.stringify(req.query));
+  console.log("➡️ Params:", JSON.stringify(req.params));
+}
+
+function logQuery(queryText, queryParams) {
+  console.log("📝 Executing SQL:");
+  console.log("➡️ Query:", queryText);
+  console.log("➡️ Params:", JSON.stringify(queryParams));
+}
+
+function logResponse(status, payload) {
+  console.log("🔵 Outgoing Response:");
+  console.log("⬅️ Status:", status);
+  console.log("⬅️ Payload:", JSON.stringify(payload));
+}
+
+function sendResponse(req, res, status, payload) {
+  logRequest(req);
+  logResponse(status, payload);
   return res.status(status).json(payload);
 }
 
@@ -27,46 +48,50 @@ const transporter = nodemailer.createTransport({
 // ================== Middleware ==================
 function requireSuperAdmin(req, res, next) {
   if (req.superAdmin?.role !== "super_admin") {
-    return sendResponse(res, 403, { success: false, message: "Access denied: Super Admins only" });
+    return sendResponse(req, res, 403, { success: false, message: "Access denied: Super Admins only" });
   }
   next();
 }
 
-// ================== Super Admin Sign Up ==================
+// ================== Super Admin Signup ==================
 router.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password)
-    return sendResponse(res, 400, { success: false, message: "All fields are required" });
+    return sendResponse(req, res, 400, { success: false, message: "All fields are required" });
 
   try {
-    const countResult = await pool.query("SELECT COUNT(*) FROM super_admins");
+    const countQuery = "SELECT COUNT(*) FROM super_admins";
+    logQuery(countQuery, []);
+    const countResult = await pool.query(countQuery);
     const count = parseInt(countResult.rows[0].count);
 
-    if (count >= 3) return sendResponse(res, 400, { success: false, message: "Only 3 super admins allowed" });
+    if (count >= 3)
+      return sendResponse(req, res, 400, { success: false, message: "Only 3 super admins allowed" });
 
     if (count > 0) {
       if (!req.headers.authorization)
-        return sendResponse(res, 401, { success: false, message: "Authorization required" });
+        return sendResponse(req, res, 401, { success: false, message: "Authorization required" });
 
       try {
         const token = req.headers.authorization.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         if (decoded.role !== "super_admin")
-          return sendResponse(res, 403, { success: false, message: "Only a super-admin can add another" });
+          return sendResponse(req, res, 403, { success: false, message: "Only a super-admin can add another" });
       } catch (err) {
-        return sendResponse(res, 401, { success: false, message: "Invalid token" });
+        return sendResponse(req, res, 401, { success: false, message: "Invalid token" });
       }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString("hex");
 
-    const insertResult = await pool.query(
-      `INSERT INTO super_admins (username, email, password, verification_token, verified)
-       VALUES ($1, $2, $3, $4, false)
-       RETURNING id, username, email, verified, created_at`,
-      [username, email, hashedPassword, verificationToken]
-    );
+    const insertQuery = `
+      INSERT INTO super_admins (username, email, password, verification_token, verified)
+      VALUES ($1, $2, $3, $4, false)
+      RETURNING id, username, email, verified, created_at
+    `;
+    logQuery(insertQuery, [username, email, hashedPassword, verificationToken]);
+    const insertResult = await pool.query(insertQuery, [username, email, hashedPassword, verificationToken]);
 
     const verifyLink = `http://localhost:5173/super-admin/verify/${verificationToken}`;
     await transporter.sendMail({
@@ -78,10 +103,14 @@ router.post("/signup", async (req, res) => {
              <a href="${verifyLink}" target="_blank">${verifyLink}</a>`,
     });
 
-    sendResponse(res, 201, { success: true, message: "Super Admin registered. Please verify your email.", superAdmin: insertResult.rows[0] });
+    sendResponse(req, res, 201, {
+      success: true,
+      message: "Super Admin registered. Please verify your email.",
+      superAdmin: insertResult.rows[0],
+    });
   } catch (err) {
-    console.error("❌ Error signing up super admin:", err.message);
-    sendResponse(res, 500, { success: false, message: "Internal Server Error" });
+    console.error("❌ Error signing up super admin:", err);
+    sendResponse(req, res, 500, { success: false, message: "Internal Server Error" });
   }
 });
 
@@ -89,123 +118,148 @@ router.post("/signup", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) return sendResponse(res, 400, { success: false, message: "Email and password are required" });
+  if (!email || !password)
+    return sendResponse(req, res, 400, { success: false, message: "Email and password are required" });
 
   try {
-    const result = await pool.query("SELECT * FROM super_admins WHERE email = $1", [email]);
+    const query = "SELECT * FROM super_admins WHERE email = $1";
+    logQuery(query, [email]);
+    const result = await pool.query(query, [email]);
     const superAdmin = result.rows[0];
 
-    if (!superAdmin) return sendResponse(res, 401, { success: false, message: "Invalid credentials: email not found" });
-    if (!superAdmin.verified) return sendResponse(res, 403, { success: false, message: "Email not verified. Please check your inbox." });
+    if (!superAdmin) return sendResponse(req, res, 401, { success: false, message: "Invalid credentials: email not found" });
+    if (!superAdmin.verified) return sendResponse(req, res, 403, { success: false, message: "Email not verified" });
 
     const isMatch = await bcrypt.compare(password, superAdmin.password);
-    if (!isMatch) return sendResponse(res, 401, { success: false, message: "Invalid credentials: wrong password" });
+    if (!isMatch) return sendResponse(req, res, 401, { success: false, message: "Invalid credentials: wrong password" });
 
     const token = jwt.sign({ id: superAdmin.id, role: "super_admin" }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
-    sendResponse(res, 200, {
+    sendResponse(req, res, 200, {
       success: true,
       message: "Super Admin login successful",
       token,
       superAdmin: { id: superAdmin.id, username: superAdmin.username, email: superAdmin.email },
     });
   } catch (err) {
-    console.error("❌ Super Admin login error:", err.message);
-    sendResponse(res, 500, { success: false, message: "Internal Server Error" });
+    console.error("❌ Super Admin login error:", err);
+    sendResponse(req, res, 500, { success: false, message: "Internal Server Error" });
   }
 });
-
 // ================== Request Password Reset ==================
 router.post("/request-password-reset", async (req, res) => {
+  logRequest(req);
   const { email } = req.body;
-  if (!email) return sendResponse(res, 400, { success: false, message: "Email is required" });
+  if (!email) return sendResponse(req, res, 400, { success: false, message: "Email is required" });
 
   try {
-    const result = await pool.query("SELECT * FROM super_admins WHERE email = $1", [email]);
+    const selectQuery = "SELECT * FROM super_admins WHERE email = $1";
+    logQuery(selectQuery, [email]);
+    const result = await pool.query(selectQuery, [email]);
     const superAdmin = result.rows[0];
-    if (!superAdmin) return sendResponse(res, 404, { success: false, message: "Super Admin not found" });
+    if (!superAdmin) return sendResponse(req, res, 404, { success: false, message: "Super Admin not found" });
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetExpiry = new Date(Date.now() + 1000 * 60 * 30);
 
-    await pool.query("UPDATE super_admins SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3", [resetToken, resetExpiry, superAdmin.id]);
+    const updateQuery = "UPDATE super_admins SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3";
+    logQuery(updateQuery, [resetToken, resetExpiry, superAdmin.id]);
+    await pool.query(updateQuery, [resetToken, resetExpiry, superAdmin.id]);
 
     const resetLink = `http://localhost:5173/super-admin/reset-password?token=${resetToken}`;
-    await transporter.sendMail({ from: `"System" <${process.env.EMAIL_USER}>`, to: email, subject: "Password Reset", html: `<p>Click to reset your password:</p><a href="${resetLink}">${resetLink}</a>` });
+    await transporter.sendMail({ 
+      from: `"System" <${process.env.EMAIL_USER}>`, 
+      to: email, 
+      subject: "Password Reset", 
+      html: `<p>Click to reset your password:</p><a href="${resetLink}">${resetLink}</a>` 
+    });
 
-    sendResponse(res, 200, { success: true, message: "Password reset email sent" });
+    sendResponse(req, res, 200, { success: true, message: "Password reset email sent" });
   } catch (err) {
-    console.error("❌ Error requesting password reset:", err.message);
-    sendResponse(res, 500, { success: false, message: "Internal Server Error" });
+    console.error("❌ Error requesting password reset:", err);
+    sendResponse(req, res, 500, { success: false, message: "Internal Server Error" });
   }
 });
 
 // ================== Reset Password ==================
 router.post("/reset-password/:token", async (req, res) => {
+  logRequest(req);
   const { token } = req.params;
   const { password } = req.body;
-  if (!password) return sendResponse(res, 400, { success: false, message: "Password is required" });
+  if (!password) return sendResponse(req, res, 400, { success: false, message: "Password is required" });
 
   try {
-    const result = await pool.query("SELECT * FROM super_admins WHERE reset_token = $1 AND reset_token_expiry > NOW()", [token]);
+    const selectQuery = "SELECT * FROM super_admins WHERE reset_token = $1 AND reset_token_expiry > NOW()";
+    logQuery(selectQuery, [token]);
+    const result = await pool.query(selectQuery, [token]);
     const superAdmin = result.rows[0];
-    if (!superAdmin) return sendResponse(res, 400, { success: false, message: "Invalid or expired token" });
+    if (!superAdmin) return sendResponse(req, res, 400, { success: false, message: "Invalid or expired token" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query("UPDATE super_admins SET password = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2", [hashedPassword, superAdmin.id]);
+    const updateQuery = "UPDATE super_admins SET password = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2";
+    logQuery(updateQuery, [hashedPassword, superAdmin.id]);
+    await pool.query(updateQuery, [hashedPassword, superAdmin.id]);
 
-    sendResponse(res, 200, { success: true, message: "Password has been reset successfully" });
+    sendResponse(req, res, 200, { success: true, message: "Password has been reset successfully" });
   } catch (err) {
-    console.error("❌ Error resetting password:", err.message);
-    sendResponse(res, 500, { success: false, message: "Internal Server Error" });
+    console.error("❌ Error resetting password:", err);
+    sendResponse(req, res, 500, { success: false, message: "Internal Server Error" });
   }
 });
 
 // ================== Verify Email ==================
 router.get("/verify/:token", async (req, res) => {
+  logRequest(req);
   const { token } = req.params;
   try {
-    const result = await pool.query(
-      "UPDATE super_admins SET verified = true, verification_token = NULL WHERE verification_token = $1 RETURNING *",
-      [token]
-    );
-    if (result.rowCount === 0) return sendResponse(res, 400, { success: false, message: "Invalid or expired token" });
-    sendResponse(res, 200, { success: true, message: "Email verified successfully", superAdmin: result.rows[0] });
+    const verifyQuery = "UPDATE super_admins SET verified = true, verification_token = NULL WHERE verification_token = $1 RETURNING *";
+    logQuery(verifyQuery, [token]);
+    const result = await pool.query(verifyQuery, [token]);
+    if (result.rowCount === 0) return sendResponse(req, res, 400, { success: false, message: "Invalid or expired token" });
+    sendResponse(req, res, 200, { success: true, message: "Email verified successfully", superAdmin: result.rows[0] });
   } catch (err) {
-    console.error("❌ Error verifying email:", err.message);
-    sendResponse(res, 500, { success: false, message: "Internal Server Error" });
+    console.error("❌ Error verifying email:", err);
+    sendResponse(req, res, 500, { success: false, message: "Internal Server Error" });
   }
 });
 
 // ================== Fetch Users ==================
 router.get("/admins", authenticateSuperAdmin, requireSuperAdmin, async (req, res) => {
+  logRequest(req);
   try {
-    const result = await pool.query("SELECT id, username, email, schoolname, type, active, api_key, created_at FROM admins");
-    sendResponse(res, 200, { success: true, admins: result.rows });
+    const query = "SELECT id, username, email, schoolname, type, active, api_key, created_at FROM admins";
+    logQuery(query, []);
+    const result = await pool.query(query);
+    sendResponse(req, res, 200, { success: true, admins: result.rows });
   } catch (err) {
-    console.error("❌ Fetch admins error:", err.message);
-    sendResponse(res, 500, { success: false, message: "Internal Server Error" });
+    console.error("❌ Fetch admins error:", err);
+    sendResponse(req, res, 500, { success: false, message: "Internal Server Error" });
   }
 });
 
 router.get("/teachers", async (req, res) => {
+  logRequest(req);
   try {
-    const teachersResult = await pool.query("SELECT * FROM teachers ORDER BY created_at DESC");
-    res.status(200).json({ teachers: teachersResult.rows });
+    const query = "SELECT * FROM teachers ORDER BY created_at DESC";
+    logQuery(query, []);
+    const teachersResult = await pool.query(query);
+    sendResponse(req, res, 200, { teachers: teachersResult.rows });
   } catch (err) {
-    console.error("Error fetching teachers:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("❌ Fetch teachers error:", err);
+    sendResponse(req, res, 500, { error: "Internal Server Error" });
   }
 });
 
-
 router.get("/students", async (req, res) => {
+  logRequest(req);
   try {
-    const studentsResult = await pool.query("SELECT * FROM students ORDER BY id DESC");
-    res.status(200).json(studentsResult.rows);
+    const query = "SELECT * FROM students ORDER BY id DESC";
+    logQuery(query, []);
+    const studentsResult = await pool.query(query);
+    sendResponse(req, res, 200, { students: studentsResult.rows });
   } catch (err) {
-    console.error("Error fetching students:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("❌ Fetch students error:", err);
+    sendResponse(req, res, 500, { error: "Internal Server Error" });
   }
 });
 
