@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const pool = require("../db");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-const { authenticateSuperAdmin } = require("../middleware/auth").default;
+const { authenticateSuperAdmin } = require("../middleware/auth");
 
 require("dotenv").config();
 const router = express.Router();
