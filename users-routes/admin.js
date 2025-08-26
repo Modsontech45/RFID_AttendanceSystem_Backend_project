@@ -8,7 +8,7 @@ const getMessage = require("../utils/messages");
 const axios = require("axios");
 require("dotenv").config();
 
-const { checkSubscription } = require('../middleware/auth'); // Import the subscription check function
+const { checkSubscription } = require("../middleware/auth").default; // Import the subscription check function
 
 const router = express.Router();
 
@@ -24,8 +24,6 @@ if (!process.env.JWT_SECRET) {
   console.error("❌ JWT_SECRET is missing in environment variables.");
   process.exit(1);
 }
-
-
 
 // ✅ Admin Signup
 router.post("/signup", async (req, res) => {
@@ -60,7 +58,15 @@ router.post("/signup", async (req, res) => {
     const result = await pool.query(
       `INSERT INTO admins (schoolname, username, email, password, api_key, verified, verification_token, type)
        VALUES ($1, $2, $3, $4, $5, false, $6, $7) RETURNING *`,
-      [schoolname, username, email, hashedPassword, apiKey, verificationToken, type]
+      [
+        schoolname,
+        username,
+        email,
+        hashedPassword,
+        apiKey,
+        verificationToken,
+        type,
+      ]
     );
 
     // Create verification link
@@ -108,7 +114,6 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-
 // ✅ Email Verification
 router.get("/verify/:token", async (req, res) => {
   const { token } = req.params;
@@ -131,12 +136,10 @@ router.get("/verify/:token", async (req, res) => {
     res.json({ message: getMessage(lang, "admin.verifiedSuccess") });
   } catch (err) {
     console.error("❌ Verification error:", err.message);
-    res
-      .status(500)
-      .json({
-        message: getMessage(lang, "common.internalError"),
-        error: err.message,
-      });
+    res.status(500).json({
+      message: getMessage(lang, "common.internalError"),
+      error: err.message,
+    });
   }
 });
 
@@ -233,7 +236,7 @@ router.post("/login", async (req, res) => {
         username: admin.username,
         email: admin.email,
         role: admin.role,
-        type: admin.type,   // ✅ now included
+        type: admin.type, // ✅ now included
         api_key: apiKey,
         created_at: admin.created_at,
         subscription_status: admin.subscription_status || "inactive",
@@ -253,6 +256,5 @@ router.post("/login", async (req, res) => {
     });
   }
 });
-
 
 module.exports = router;
