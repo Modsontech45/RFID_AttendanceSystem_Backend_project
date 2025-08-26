@@ -1,5 +1,5 @@
 import { verify } from "jsonwebtoken";
-import getMessage from "../utils/messages";
+import getMessage from "../utils/messages.js";
 require("dotenv").config();
 
 /**
