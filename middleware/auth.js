@@ -1,5 +1,5 @@
-import { verify } from "jsonwebtoken";
-import getMessage from "../utils/messages.js";
+const jwt = require("jsonwebtoken");
+const getMessage = require("../utils/messages");
 require("dotenv").config();
 
 /**
@@ -14,7 +14,7 @@ const authenticateAdmin = (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  verify(token, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
       console.log("Admin JWT verification error:", err);
       return res.status(403).json({ message: getMessage(lang, "auth.invalidToken") });
@@ -44,7 +44,7 @@ const authenticateTeacher = (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  verify(token, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
       console.log("Teacher JWT verification error:", err);
       return res.status(403).json({ message: getMessage(lang, "auth.invalidToken") });
@@ -74,7 +74,7 @@ const authenticateSuperAdmin = (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  verify(token, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
       console.log("Super Admin JWT verification error:", err);
       return res.status(403).json({ message: getMessage(lang, "auth.invalidToken") });
@@ -126,7 +126,7 @@ async function checkSubscription(admin) {
   return "none";
 }
 
-export default {
+module.exports = {
   authenticateAdmin,
   authenticateTeacher,
   authenticateSuperAdmin, // ✅ new export
