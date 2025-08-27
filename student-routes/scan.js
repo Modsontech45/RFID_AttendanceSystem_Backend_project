@@ -46,8 +46,8 @@ router.post('/', async (req, res) => {
       const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
       for (const s of allStudents.rows) {
         await pool.query(
-          `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key)
-           VALUES ($1, $2, $3, $4, false, false, 'absent', $5)`,
+          `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key, punctuality)
+           VALUES ($1, $2, $3, $4, false, false, 'absent', $5, 'not_checked')`,
           [s.uid, s.name, s.form, dateStr, s.api_key]
         );
       }
