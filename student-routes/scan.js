@@ -176,9 +176,10 @@ if (requestApiKey && requestApiKey !== student.api_key) {
       //check if now is greater than the sign in time but less than sign in time plus one hour then punctuality is equal to late
     if (isSignInTime && !signed_in) {
       sign_in_time = now;
-      punctuality = (now > new Date(sign_in_time).getTime() + 60 * 60 * 1000) ? 'late' : 'on_time';
+      punctuality = (now > (sign_in_end + 1)  ? 'late' : 'on_time');
       signed_in = true;
-    } else {
+    } else if (!(sign_in_end+1) < nowStr && !(sign_out_start-1) > nowStr) {
+      // late comers
       const outsideTime = {
         uid,
         device_uid,
@@ -212,7 +213,7 @@ if (requestApiKey && requestApiKey !== student.api_key) {
       }
       sign_out_time = now;
       signed_out = true;
-      punctuality = (now < new Date(sign_in_time).getTime() - 60 * 60 * 1000) ? 'leave_early' : 'on_time';
+      punctuality = (now < sign_out_start ? 'leave_early' : 'on_time');
     }
 
     // 8. Determine final status
