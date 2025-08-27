@@ -178,7 +178,7 @@ if (requestApiKey && requestApiKey !== student.api_key) {
       sign_in_time = now;
       punctuality = (isSignInTime + 1) ? 'late' : 'on_time';
       signed_in = true;
-    } else if (!(sign_in_end+1) < nowStr && !(sign_out_start-1) > nowStr) {
+    } else if ((!isSignInTime && !isSignOutTime) || (!(isSignInTime + 1) && !(isSignOutTime - 1))) {
       // late comers
       const outsideTime = {
         uid,
