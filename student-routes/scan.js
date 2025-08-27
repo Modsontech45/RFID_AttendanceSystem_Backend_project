@@ -67,7 +67,7 @@ router.post('/', async (req, res) => {
     const signOutEnd = new Date(`${dateStr}T${sign_out_end}`);
 
     // Allow 1-hour late sign-in
-    const signInLateLimit = new Date(signInStart);
+    const signInLateLimit = new Date(signInEnd);
     signInLateLimit.setHours(signInLateLimit.getHours() + 1);
 
     // Check if current time is valid for sign-in or sign-out
