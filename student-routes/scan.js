@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
     // 3. Hardcoded sign-in/sign-out times for testing
     // Format: "HH:MM:SS" (24-hour format)
     const sign_in_start = "08:00:00";    // official start
-    const sign_in_end   = "09:00:00";    // official end
+    const sign_in_end   = "11:00:00";    // official end
     const sign_out_start = "15:00:00";   // official sign-out start
     const sign_out_end   = "16:00:00";   // official sign-out end
 
