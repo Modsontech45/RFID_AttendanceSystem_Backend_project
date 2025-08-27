@@ -14,13 +14,13 @@ const transporter = nodemailer.createTransport({
 
 const latestScans = {};
 
-// ⏱ Helper: convert HH:MM:SS → seconds
+// Helper: convert HH:MM:SS → seconds
 const toSeconds = (t) => {
-  const [h, m, s] = t.split(':').map(Number);
+  const [h, m, s] = t.split(":").map(Number);
   return h * 3600 + m * 60 + s;
 };
 
-// ⏱ Helper: punctuality rules
+// Helper: punctuality checker
 const getPunctuality = (now, start, end, type) => {
   const nowStr = now.toTimeString().split(" ")[0];
   const nowSec = toSeconds(nowStr);
@@ -33,11 +33,13 @@ const getPunctuality = (now, start, end, type) => {
     if (nowSec > endSec && nowSec <= startSec + gracePeriodSec) return "late";
     return null;
   }
+
   if (type === "sign_out") {
     if (nowSec < startSec) return "leave_early";
     if (nowSec >= startSec && nowSec <= endSec) return "on_time";
     return null;
   }
+
   return null;
 };
 
@@ -55,8 +57,9 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // 1. Find student
-    let studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
+    // 1. Check if student exists
+    const studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
+
     if (studentRes.rows.length === 0) {
       const notFound = {
         uid,
@@ -74,12 +77,13 @@ router.post('/', async (req, res) => {
     let student = studentRes.rows[0];
     const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
 
-    // 🔐 API key check
+    // API key validation
     if (requestApiKey && requestApiKey !== student.api_key) {
       const sameUidSameSchool = await pool.query(
         'SELECT * FROM students WHERE uid = $1 AND api_key = $2 LIMIT 1',
         [uid, requestApiKey]
       );
+
       if (sameUidSameSchool.rows.length > 0) {
         student = sameUidSameSchool.rows[0];
       } else {
@@ -103,8 +107,12 @@ router.post('/', async (req, res) => {
 
     const dateStr = now.toISOString().slice(0, 10);
 
-    // 2. Ensure attendance records exist for today
-    const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
+    // 2. Ensure daily attendance records exist
+    const attendanceCheck = await pool.query(
+      'SELECT COUNT(*) FROM attendance WHERE date = $1',
+      [dateStr]
+    );
+
     if (parseInt(attendanceCheck.rows[0].count) === 0) {
       const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
       for (const s of allStudents.rows) {
@@ -116,12 +124,13 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // 3. Load time settings
+    // 3. Fetch time settings
     const timeSettingsRes = await pool.query(
       `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
        FROM time_settings WHERE api_key = $1 LIMIT 1`,
       [student.api_key]
     );
+
     if (timeSettingsRes.rows.length === 0) {
       return res.status(400).json({
         message: getMessage(lang, 'timeSettings.notFound'),
@@ -131,29 +140,42 @@ router.post('/', async (req, res) => {
 
     const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
 
-    // 4. Attendance record
+    // 4. Fetch today's attendance record
     const attendanceRes = await pool.query(
       'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
       [uid, dateStr]
     );
-    const existing = attendanceRes.rows[0];
-    let { sign_in_time, sign_out_time, signed_in, signed_out } = existing;
-    let punctuality = existing.punctuality || null;
 
-    // 5. Sign-in handling
+    const existing = attendanceRes.rows[0];
+    let { sign_in_time, sign_out_time, signed_in, signed_out, punctuality } = existing;
+
+    // 5. Handle sign-in
     if (!signed_in) {
-      const p = getPunctuality(now, sign_in_start, sign_in_end, "sign_in");
-      if (p) {
+      const punctualityResult = getPunctuality(now, sign_in_start, sign_in_end, "sign_in");
+      if (punctualityResult) {
         sign_in_time = now;
+        punctuality = punctualityResult;
         signed_in = true;
-        punctuality = p;
+      } else {
+        const outsideTime = {
+          uid,
+          device_uid,
+          exists: true,
+          name: student.name,
+          timestamp: now,
+          message: getMessage(lang, 'scan.outsideTime'),
+          sign: 0,
+          flag: getMessage(lang, 'scan.outsideFlag')
+        };
+        latestScans[device_uid] = outsideTime;
+        return res.json(outsideTime);
       }
     }
 
-    // 6. Sign-out handling
+    // 6. Handle sign-out
     if (!signed_out) {
-      const p = getPunctuality(now, sign_out_start, sign_out_end, "sign_out");
-      if (p) {
+      const punctualityResult = getPunctuality(now, sign_out_start, sign_out_end, "sign_out");
+      if (punctualityResult) {
         if (!signed_in) {
           const mustSignInFirst = {
             uid,
@@ -170,11 +192,11 @@ router.post('/', async (req, res) => {
         }
         sign_out_time = now;
         signed_out = true;
-        punctuality = p; // overwrite punctuality with sign_out status
+        punctuality = punctualityResult;
       }
     }
 
-    // 7. Status update
+    // 7. Determine final status
     let status = 'absent';
     if (signed_in && signed_out) status = 'present';
     else if (signed_in) status = 'partial';
@@ -186,10 +208,12 @@ router.post('/', async (req, res) => {
       [sign_in_time, sign_out_time, signed_in, signed_out, status, punctuality, existing.id]
     );
 
-    // 8. Success response
-    const signedMessage = signed_out
-      ? getMessage(lang, 'scan.signedOut')
-      : getMessage(lang, 'scan.signedIn');
+    let signedMessage = "";
+    if (signed_in && !signed_out) {
+      signedMessage = punctuality === "late" ? getMessage(lang, 'scan.late') : getMessage(lang, 'scan.signedIn');
+    } else if (signed_out) {
+      signedMessage = punctuality === "leave_early" ? getMessage(lang, 'scan.leaveEarly') : getMessage(lang, 'scan.signedOut');
+    }
 
     const scanSuccess = {
       uid,
@@ -198,7 +222,6 @@ router.post('/', async (req, res) => {
       name: student.name,
       timestamp: now,
       message: signedMessage,
-      punctuality,
       sign: 1,
       flag: signedMessage
     };
