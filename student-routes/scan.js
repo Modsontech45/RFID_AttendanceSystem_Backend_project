@@ -1,9 +1,10 @@
 const express = require('express');
-const pool = require('../db');
+const pool = require('../db'); // PostgreSQL connection pool
 const router = express.Router();
-const getMessage = require('../utils/messages');
+const getMessage = require('../utils/messages'); // function for multilingual messages
 const nodemailer = require("nodemailer");
 
+// Setup nodemailer transporter for email notifications (currently not used)
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -12,36 +13,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Object to store the latest scan result per device (used for /queue endpoint)
 const latestScans = {};
-
-// Helper: convert HH:MM:SS → seconds
-const toSeconds = (t) => {
-  const [h, m, s] = t.split(":").map(Number);
-  return h * 3600 + m * 60 + s;
-};
-
-// Helper: punctuality checker
-const getPunctuality = (now, start, end, type) => {
-  const nowStr = now.toTimeString().split(" ")[0];
-  const nowSec = toSeconds(nowStr);
-  const startSec = toSeconds(start);
-  const endSec = toSeconds(end);
-  const gracePeriodSec = 60 * 60; // 1 hour
-
-  if (type === "sign_in") {
-    if (nowSec >= startSec && nowSec <= endSec) return "on_time";
-    if (nowSec > endSec && nowSec <= startSec + gracePeriodSec) return "late";
-    return null;
-  }
-
-  if (type === "sign_out") {
-    if (nowSec < startSec) return "leave_early";
-    if (nowSec >= startSec && nowSec <= endSec) return "on_time";
-    return null;
-  }
-
-  return null;
-};
 
 // POST /scan
 router.post('/', async (req, res) => {
@@ -49,6 +22,7 @@ router.post('/', async (req, res) => {
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
   const now = new Date();
 
+  // Validate request body
   if (!uid || !device_uid) {
     return res.status(400).json({
       message: getMessage(lang, 'scan.missingFields'),
@@ -57,7 +31,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // 1. Check if student exists
+    // 1. Check if student exists in the database
     const studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
 
     if (studentRes.rows.length === 0) {
@@ -74,19 +48,30 @@ router.post('/', async (req, res) => {
       return res.json(notFound);
     }
 
-    let student = studentRes.rows[0];
+    let student = studentRes.rows[0]; // student record
     const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
 
-    // API key validation
+    console.log("🔐 Incoming request:");
+    console.log("→ device_uid:", device_uid);
+    console.log("→ uid:", uid);
+    console.log("→ API key from request:", requestApiKey);
+    console.log("→ Student's API key in database:", student.api_key);
+
+    // 2. Handle cross-school API key mismatch
     if (requestApiKey && requestApiKey !== student.api_key) {
+      console.log("⚠️ API key mismatch detected. Checking if UID belongs to the requesting school...");
+
+      // Check if UID exists under the requested API key (same UID, different school)
       const sameUidSameSchool = await pool.query(
         'SELECT * FROM students WHERE uid = $1 AND api_key = $2 LIMIT 1',
         [uid, requestApiKey]
       );
 
       if (sameUidSameSchool.rows.length > 0) {
-        student = sameUidSameSchool.rows[0];
+        console.log("✅ UID found under the requesting API key. Proceeding with this student.");
+        student = sameUidSameSchool.rows[0]; // override student to match API key
       } else {
+        console.log("🚫 UID does not belong to the current school.");
         const schoolRes = await pool.query(
           'SELECT schoolname FROM admins WHERE api_key = $1 LIMIT 1',
           [student.api_key]
@@ -98,21 +83,20 @@ router.post('/', async (req, res) => {
           device_uid,
           student_name: student.name,
           sign: 0,
-          timestamp: new Date(),
+          timestamp: now,
           flag: getMessage(lang, 'scan.mismatch', otherSchool)
         };
+        console.log(`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`);
         return res.json(mismatch);
       }
+    } else {
+      console.log("✅ API key matches or no conflict detected.");
     }
 
-    const dateStr = now.toISOString().slice(0, 10);
+    const dateStr = now.toISOString().slice(0, 10); // Get current date in YYYY-MM-DD
 
-    // 2. Ensure daily attendance records exist
-    const attendanceCheck = await pool.query(
-      'SELECT COUNT(*) FROM attendance WHERE date = $1',
-      [dateStr]
-    );
-
+    // 3. Ensure daily attendance records exist for all students
+    const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
     if (parseInt(attendanceCheck.rows[0].count) === 0) {
       const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
       for (const s of allStudents.rows) {
@@ -124,7 +108,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // 3. Fetch time settings
+    // 4. Fetch the school's time settings for sign-in/out
     const timeSettingsRes = await pool.query(
       `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
        FROM time_settings WHERE api_key = $1 LIMIT 1`,
@@ -140,23 +124,18 @@ router.post('/', async (req, res) => {
 
     const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
 
-    // 4. Fetch today's attendance record
-    const attendanceRes = await pool.query(
-      'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
-      [uid, dateStr]
-    );
+    // 5. Compare current time with sign-in/out windows
+    const nowStr = now.toTimeString().split(" ")[0]; // "HH:MM:SS"
+    const isBetween = (start, end, current) => current >= start && current <= end;
+    const isSignInTime = isBetween(sign_in_start, sign_in_end, nowStr);
+    const isSignOutTime = isBetween(sign_out_start, sign_out_end, nowStr);
 
-    const existing = attendanceRes.rows[0];
-    let { sign_in_time, sign_out_time, signed_in, signed_out, punctuality } = existing;
+    // If student is outside both sign-in and sign-out times, allow sign-in within 1 hour after start
+    if (!isSignInTime && !isSignOutTime) {
+      const signInLimit = new Date(`${dateStr}T${sign_in_start}`);
+      signInLimit.setHours(signInLimit.getHours() + 1); // 1 hour after official sign-in
 
-    // 5. Handle sign-in
-    if (!signed_in) {
-      const punctualityResult = getPunctuality(now, sign_in_start, sign_in_end, "sign_in");
-      if (punctualityResult) {
-        sign_in_time = now;
-        punctuality = punctualityResult;
-        signed_in = true;
-      } else {
+      if (now > signInLimit) {
         const outsideTime = {
           uid,
           device_uid,
@@ -172,35 +151,52 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // 6. Handle sign-out
-    if (!signed_out) {
-      const punctualityResult = getPunctuality(now, sign_out_start, sign_out_end, "sign_out");
-      if (punctualityResult) {
-        if (!signed_in) {
-          const mustSignInFirst = {
-            uid,
-            device_uid,
-            exists: true,
-            name: student.name,
-            timestamp: now,
-            message: getMessage(lang, 'scan.signInFirst'),
-            sign: 3,
-            flag: getMessage(lang, 'scan.signInFlag')
-          };
-          latestScans[device_uid] = mustSignInFirst;
-          return res.json(mustSignInFirst);
-        }
-        sign_out_time = now;
-        signed_out = true;
-        punctuality = punctualityResult;
-      }
+    // 6. Fetch today's attendance record
+    const attendanceRes = await pool.query('SELECT * FROM attendance WHERE uid = $1 AND date = $2', [uid, dateStr]);
+    const existing = attendanceRes.rows[0];
+    let { sign_in_time, sign_out_time, signed_in, signed_out, punctuality } = existing;
+
+    // 7. Handle sign-in logic
+    if (!signed_in) {
+      sign_in_time = now;
+      signed_in = true;
+
+      // Determine punctuality: "on_time" if within official sign-in, "late" if within 1 hour after
+      const signInDeadline = new Date(`${dateStr}T${sign_in_start}`);
+      const signInLimit = new Date(signInDeadline);
+      signInLimit.setHours(signInLimit.getHours() + 1);
+
+      punctuality = now <= new Date(`${dateStr}T${sign_in_end}`) ? 'on_time' : (now <= signInLimit ? 'late' : 'late');
     }
 
-    // 7. Determine final status
+    // 8. Handle sign-out logic
+    if (isSignOutTime && !signed_out) {
+      if (!signed_in) {
+        // Prevent sign-out without signing in first
+        const mustSignInFirst = {
+          uid,
+          device_uid,
+          exists: true,
+          name: student.name,
+          timestamp: now,
+          message: getMessage(lang, 'scan.signInFirst'),
+          sign: 3,
+          flag: getMessage(lang, 'scan.signInFlag')
+        };
+        latestScans[device_uid] = mustSignInFirst;
+        return res.json(mustSignInFirst);
+      }
+      sign_out_time = now;
+      signed_out = true;
+      // No leave early logic, punctuality is only for sign-in
+    }
+
+    // 9. Determine final attendance status
     let status = 'absent';
     if (signed_in && signed_out) status = 'present';
     else if (signed_in) status = 'partial';
 
+    // 10. Update attendance record in the database
     await pool.query(
       `UPDATE attendance
        SET sign_in_time = $1, sign_out_time = $2, signed_in = $3, signed_out = $4, status = $5, punctuality = $6
@@ -208,12 +204,8 @@ router.post('/', async (req, res) => {
       [sign_in_time, sign_out_time, signed_in, signed_out, status, punctuality, existing.id]
     );
 
-    let signedMessage = "";
-    if (signed_in && !signed_out) {
-      signedMessage = punctuality === "late" ? getMessage(lang, 'scan.late') : getMessage(lang, 'scan.signedIn');
-    } else if (signed_out) {
-      signedMessage = punctuality === "leave_early" ? getMessage(lang, 'scan.leaveEarly') : getMessage(lang, 'scan.signedOut');
-    }
+    // 11. Prepare response message
+    const signedMessage = signed_in ? getMessage(lang, 'scan.signedIn') : getMessage(lang, 'scan.signedOut');
 
     const scanSuccess = {
       uid,
@@ -263,7 +255,7 @@ router.get('/queue', (req, res) => {
 
   const scan = latestScans[device_uid];
   if (scan) {
-    delete latestScans[device_uid];
+    delete latestScans[device_uid]; // clear queue after reading
     return res.json([scan]);
   }
 
