@@ -194,7 +194,7 @@ router.post('/', async (req, res) => {
     // 9. Determine final attendance status
     let status = 'absent';
     if (signed_in && signed_out) status = 'present';
-    else if (signed_in) status = 'partial';
+    else if (signed_in && (punctuality === 'late' || punctuality === 'on_time')) status = 'partial';
 
     // 10. Update attendance record in the database
     await pool.query(
@@ -205,7 +205,7 @@ router.post('/', async (req, res) => {
     );
 
     // 11. Prepare response message
-    const signedMessage = signed_in ? getMessage(lang, 'scan.signedIn') : getMessage(lang, 'scan.signedOut');
+    const signedMessage = signed_in && punctuality === 'on_time' ? getMessage(lang, 'scan.signedIn') : signed_in && punctuality === 'late' ? getMessage(lang, 'scan.late') : getMessage(lang, 'scan.signedOut');
 
     const scanSuccess = {
       uid,
