@@ -109,20 +109,29 @@ router.post('/', async (req, res) => {
     }
 
     // 4. Fetch the school's time settings for sign-in/out
-    const timeSettingsRes = await pool.query(
-      `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
-       FROM time_settings WHERE api_key = $1 LIMIT 1`,
-      [student.api_key]
-    );
+    // const timeSettingsRes = await pool.query(
+    //   `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
+    //    FROM time_settings WHERE api_key = $1 LIMIT 1`,
+    //   [student.api_key]
+    // );
 
-    if (timeSettingsRes.rows.length === 0) {
-      return res.status(400).json({
-        message: getMessage(lang, 'timeSettings.notFound'),
-        sign: 0
-      });
-    }
+    // if (timeSettingsRes.rows.length === 0) {
+    //   return res.status(400).json({
+    //     message: getMessage(lang, 'timeSettings.notFound'),
+    //     sign: 0
+    //   });
+    // }
 
-    const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
+    // const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
+
+
+    // 4. Hardcoded sign-in/sign-out times for testing
+// Format: "HH:MM:SS" (24-hour format)
+   const sign_in_start = "08:00:00";   // official sign-in start
+   const sign_in_end   = "11:00:00";   // official sign-in end
+   const sign_out_start = "15:00:00";  // official sign-out start
+   const sign_out_end   = "16:00:00";  // official sign-out end
+
 
     // 5. Compare current time with sign-in/out windows
     const nowStr = now.toTimeString().split(" ")[0]; // "HH:MM:SS"
@@ -166,7 +175,8 @@ router.post('/', async (req, res) => {
       const signInLimit = new Date(signInDeadline);
       signInLimit.setHours(signInLimit.getHours() + 1);
 
-      punctuality = now <= new Date(`${dateStr}T${sign_in_end}`) ? 'on_time' : (now <= signInLimit ? 'late' : 'late');
+      punctuality = now <= new Date(`${dateStr}T${sign_in_end}`) ? 'on_time' : 'late';
+
     }
 
     // 8. Handle sign-out logic
@@ -195,6 +205,7 @@ router.post('/', async (req, res) => {
     let status = 'absent';
     if (signed_in && signed_out) status = 'present';
     else if (signed_in && (punctuality === 'late' || punctuality === 'on_time')) status = 'partial';
+
 
     // 10. Update attendance record in the database
     await pool.query(
