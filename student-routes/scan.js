@@ -1,10 +1,8 @@
-
- const express = require('express');
+const express = require('express');
 const pool = require('../db');
 const router = express.Router();
 const getMessage = require('../utils/messages');
 const nodemailer = require("nodemailer");
-
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -15,6 +13,33 @@ const transporter = nodemailer.createTransport({
 });
 
 const latestScans = {};
+
+// ⏱ Helper: convert HH:MM:SS → seconds
+const toSeconds = (t) => {
+  const [h, m, s] = t.split(':').map(Number);
+  return h * 3600 + m * 60 + s;
+};
+
+// ⏱ Helper: punctuality rules
+const getPunctuality = (now, start, end, type) => {
+  const nowStr = now.toTimeString().split(" ")[0];
+  const nowSec = toSeconds(nowStr);
+  const startSec = toSeconds(start);
+  const endSec = toSeconds(end);
+  const gracePeriodSec = 60 * 60; // 1 hour
+
+  if (type === "sign_in") {
+    if (nowSec >= startSec && nowSec <= endSec) return "on_time";
+    if (nowSec > endSec && nowSec <= startSec + gracePeriodSec) return "late";
+    return null;
+  }
+  if (type === "sign_out") {
+    if (nowSec < startSec) return "leave_early";
+    if (nowSec >= startSec && nowSec <= endSec) return "on_time";
+    return null;
+  }
+  return null;
+};
 
 // POST /scan
 router.post('/', async (req, res) => {
@@ -30,9 +55,8 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // 1. Check if student exists
-    const studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
-
+    // 1. Find student
+    let studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
     if (studentRes.rows.length === 0) {
       const notFound = {
         uid,
@@ -47,66 +71,40 @@ router.post('/', async (req, res) => {
       return res.json(notFound);
     }
 
-    const student = studentRes.rows[0];
-const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
+    let student = studentRes.rows[0];
+    const requestApiKey = req.headers['x-api-key'] || req.query.api_key || req.body.api_key;
 
-console.log("🔐 Incoming request:");
-console.log("→ device_uid:", device_uid);
-console.log("→ uid:", uid);
-console.log("→ API key from request:", requestApiKey);
-console.log("→ Student's API key in database:", student.api_key);
-
-// If API keys don't match, investigate deeper
-if (requestApiKey && requestApiKey !== student.api_key) {
-  console.log("⚠️ API key mismatch detected. Checking if UID belongs to the requesting school...");
-
-  // Check if UID exists under the requesting API key (same UID in different school)
-  const sameUidSameSchool = await pool.query(
-    'SELECT * FROM students WHERE uid = $1 AND api_key = $2 LIMIT 1',
-    [uid, requestApiKey]
-  );
-
-  if (sameUidSameSchool.rows.length > 0) {
-    console.log("✅ UID found under the requesting API key. Proceeding with this student.");
-
-    // Override student to match the school associated with the current request
-    student = sameUidSameSchool.rows[0];
-  } else {
-    console.log("🚫 UID does not belong to the current school.");
-
-    const schoolRes = await pool.query(
-      'SELECT schoolname FROM admins WHERE api_key = $1 LIMIT 1',
-      [student.api_key]
-    );
-    const otherSchool = schoolRes.rows[0]?.schoolname || 'another school';
-    const mismatch = {
-       message:getMessage(lang, 'scan.mismatch',otherSchool),
-      student_uid: uid,
-      device_uid,
-      student_name: student.name,
-      sign: 0,
-      timestamp: new Date(),
-      flag: getMessage(lang, 'scan.mismatch',otherSchool)
-
+    // 🔐 API key check
+    if (requestApiKey && requestApiKey !== student.api_key) {
+      const sameUidSameSchool = await pool.query(
+        'SELECT * FROM students WHERE uid = $1 AND api_key = $2 LIMIT 1',
+        [uid, requestApiKey]
+      );
+      if (sameUidSameSchool.rows.length > 0) {
+        student = sameUidSameSchool.rows[0];
+      } else {
+        const schoolRes = await pool.query(
+          'SELECT schoolname FROM admins WHERE api_key = $1 LIMIT 1',
+          [student.api_key]
+        );
+        const otherSchool = schoolRes.rows[0]?.schoolname || 'another school';
+        const mismatch = {
+          message: getMessage(lang, 'scan.mismatch', otherSchool),
+          student_uid: uid,
+          device_uid,
+          student_name: student.name,
+          sign: 0,
+          timestamp: new Date(),
+          flag: getMessage(lang, 'scan.mismatch', otherSchool)
+        };
+        return res.json(mismatch);
+      }
     }
-    console.log(`🚨 Cross-school access attempt: Student from "${otherSchool}" tried to sign in to a different school.`);
-      console.log(mismatch)
-    return res.json(mismatch);
-   
-  }
-} else {
-  console.log("✅ API key matches or no conflict detected.");
-}
-
 
     const dateStr = now.toISOString().slice(0, 10);
 
-    // 2. Ensure daily attendance records exist
-    const attendanceCheck = await pool.query(
-      'SELECT COUNT(*) FROM attendance WHERE date = $1',
-      [dateStr]
-    );
-
+    // 2. Ensure attendance records exist for today
+    const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
     if (parseInt(attendanceCheck.rows[0].count) === 0) {
       const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
       for (const s of allStudents.rows) {
@@ -118,13 +116,12 @@ if (requestApiKey && requestApiKey !== student.api_key) {
       }
     }
 
-    // 3. Fetch time settings
+    // 3. Load time settings
     const timeSettingsRes = await pool.query(
       `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
        FROM time_settings WHERE api_key = $1 LIMIT 1`,
       [student.api_key]
     );
-
     if (timeSettingsRes.rows.length === 0) {
       return res.status(400).json({
         message: getMessage(lang, 'timeSettings.notFound'),
@@ -132,91 +129,52 @@ if (requestApiKey && requestApiKey !== student.api_key) {
       });
     }
 
-    const {
-      sign_in_start,
-      sign_in_end,
-      sign_out_start,
-      sign_out_end
-    } = timeSettingsRes.rows[0];
+    const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
 
-    // 4. Compare current time with sign-in/out windows
-    const nowStr = now.toTimeString().split(" ")[0]; // "HH:MM:SS"
-    const isBetween = (start, end, current) => current >= start && current <= end;
-
-    const isSignInTime = isBetween(sign_in_start, sign_in_end, nowStr);
-    const isSignOutTime = isBetween(sign_out_start, sign_out_end, nowStr);
-
-    // if (!isSignInTime && !isSignOutTime) {
-    //   // late comers
-    
-    //   const outsideTime = {
-    //     uid,
-    //     device_uid,
-    //     exists: true,
-    //     name: student.name,
-    //     timestamp: now,
-    //     message: getMessage(lang, 'scan.outsideTime'),
-    //     sign: 0,
-    //     flag: getMessage(lang, 'scan.outsideFlag')
-    //   };
-    //   latestScans[device_uid] = outsideTime;
-    //   return res.json(outsideTime);
-    // }
-
-    // 5. Fetch today's attendance record
+    // 4. Attendance record
     const attendanceRes = await pool.query(
       'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
       [uid, dateStr]
     );
-
     const existing = attendanceRes.rows[0];
-    let { sign_in_time, sign_out_time, signed_in, signed_out, punctuality } = existing;
+    let { sign_in_time, sign_out_time, signed_in, signed_out } = existing;
+    let punctuality = existing.punctuality || null;
 
-    // 6. Handle sign-in
-      //check if now is greater than the sign in time but less than sign in time plus one hour then punctuality is equal to late
-    if (isSignInTime && !signed_in) {
-      sign_in_time = now;
-      punctuality = (isSignInTime + 1) ? 'late' : 'on_time';
-      signed_in = true;
-    } else if ((!isSignInTime && !isSignOutTime) || (!(isSignInTime + 1) && !(isSignOutTime - 1))) {
-      // late comers
-      const outsideTime = {
-        uid,
-        device_uid,
-        exists: true,
-        name: student.name,
-        timestamp: now,
-        message: getMessage(lang, 'scan.outsideTime'),
-        sign: 0,
-        flag: getMessage(lang, 'scan.outsideFlag')
-      };
-      latestScans[device_uid] = outsideTime;
-      return res.json(outsideTime);
-
-    }
-
-    // 7. Handle sign-out
-    if (isSignOutTime && !signed_out) {
-      if (!signed_in) {
-        const mustSignInFirst = {
-          uid,
-          device_uid,
-          exists: true,
-          name: student.name,
-          timestamp: now,
-          message: getMessage(lang, 'scan.signInFirst'),
-          sign: 3,
-          flag: getMessage(lang, 'scan.signInFlag')
-        };
-        latestScans[device_uid] = mustSignInFirst;
-        return res.json(mustSignInFirst);
+    // 5. Sign-in handling
+    if (!signed_in) {
+      const p = getPunctuality(now, sign_in_start, sign_in_end, "sign_in");
+      if (p) {
+        sign_in_time = now;
+        signed_in = true;
+        punctuality = p;
       }
-      sign_out_time = now;
-      signed_out = true;
-      punctuality = (isSignOutTime - 1) ? 'leave_early' : 'on_time';
     }
 
-    // 8. Determine final status
+    // 6. Sign-out handling
+    if (!signed_out) {
+      const p = getPunctuality(now, sign_out_start, sign_out_end, "sign_out");
+      if (p) {
+        if (!signed_in) {
+          const mustSignInFirst = {
+            uid,
+            device_uid,
+            exists: true,
+            name: student.name,
+            timestamp: now,
+            message: getMessage(lang, 'scan.signInFirst'),
+            sign: 3,
+            flag: getMessage(lang, 'scan.signInFlag')
+          };
+          latestScans[device_uid] = mustSignInFirst;
+          return res.json(mustSignInFirst);
+        }
+        sign_out_time = now;
+        signed_out = true;
+        punctuality = p; // overwrite punctuality with sign_out status
+      }
+    }
+
+    // 7. Status update
     let status = 'absent';
     if (signed_in && signed_out) status = 'present';
     else if (signed_in) status = 'partial';
@@ -228,9 +186,10 @@ if (requestApiKey && requestApiKey !== student.api_key) {
       [sign_in_time, sign_out_time, signed_in, signed_out, status, punctuality, existing.id]
     );
 
-    const signedMessage = isSignInTime
-      ? getMessage(lang, 'scan.signedIn')
-      : (isSignInTime + 1) ? getMessage(lang, 'scan.late') : getMessage(lang, 'scan.signedOut');
+    // 8. Success response
+    const signedMessage = signed_out
+      ? getMessage(lang, 'scan.signedOut')
+      : getMessage(lang, 'scan.signedIn');
 
     const scanSuccess = {
       uid,
@@ -239,6 +198,7 @@ if (requestApiKey && requestApiKey !== student.api_key) {
       name: student.name,
       timestamp: now,
       message: signedMessage,
+      punctuality,
       sign: 1,
       flag: signedMessage
     };
@@ -288,5 +248,3 @@ router.get('/queue', (req, res) => {
 });
 
 module.exports = router;
-
-
