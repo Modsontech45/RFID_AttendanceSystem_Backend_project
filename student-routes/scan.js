@@ -53,13 +53,24 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // 3. Hardcoded sign-in/sign-out times for testing
-    // Format: "HH:MM:SS" (24-hour format)
-    const sign_in_start = "08:00:00";    // official start
-    const sign_in_end   = "11:00:00";    // official end
-    const sign_out_start = "15:00:00";   // official sign-out start
-    const sign_out_end   = "16:00:00";   // official sign-out end
 
+     // 4. Fetch the school's time settings for sign-in/out
+    const timeSettingsRes = await pool.query(
+      `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
+       FROM time_settings WHERE api_key = $1 LIMIT 1`,
+      [student.api_key]
+    );
+
+    if (timeSettingsRes.rows.length === 0) {
+      return res.status(400).json({
+        message: getMessage(lang, 'timeSettings.notFound'),
+        sign: 0
+      });
+    }
+
+    const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
+
+  
     // Convert to Date objects
     const signInStart = new Date(`${dateStr}T${sign_in_start}`);
     const signInEnd = new Date(`${dateStr}T${sign_in_end}`);
