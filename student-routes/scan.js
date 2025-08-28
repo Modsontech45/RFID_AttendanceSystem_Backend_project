@@ -241,7 +241,6 @@ router.post('/admin', async (req, res) => {
 
     let existing;
     if (attendanceRes.rows.length === 0) {
-      // Insert new row if missing
       const insertRes = await pool.query(
         `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key, punctuality)
          VALUES ($1, $2, $3, $4, false, false, 'absent', $5, 'not_checked')
@@ -278,6 +277,16 @@ router.post('/admin', async (req, res) => {
     const signInLateLimit = new Date(signInEnd);
     signInLateLimit.setHours(signInLateLimit.getHours() + 1);
 
+    // ✅ Log the time settings for debugging
+    console.log("Time Settings:", {
+      signInStart,
+      signInEnd,
+      signInLateLimit,
+      signOutStart,
+      signOutEnd,
+      now,
+    });
+
     const isOfficialSignIn = now >= signInStart && now <= signInEnd;
     const isLateSignIn = now > signInEnd && now <= signInLateLimit;
     const isSignOutTime = now >= signOutStart && now <= signOutEnd;
@@ -286,10 +295,13 @@ router.post('/admin', async (req, res) => {
     if (!signed_in && (isOfficialSignIn || isLateSignIn)) {
       sign_in_time = now;
       signed_in = true;
-      punctuality = 'manual';
+      punctuality = isOfficialSignIn ? 'on_time' : 'late'; // set punctuality based on sign-in time
     } else if (!signed_out && isSignOutTime) {
       sign_out_time = now;
       signed_out = true;
+      if (!signed_in) {
+        punctuality = 'missed_sign_in'; // student signed out without signing in
+      }
     } else if (!signed_in && !isOfficialSignIn && !isLateSignIn && !isSignOutTime) {
       return res.status(400).json({
         message: getMessage(lang, 'scan.outsideTime'),
@@ -303,6 +315,9 @@ router.post('/admin', async (req, res) => {
     if (signed_in && signed_out) status = 'present';
     else if (signed_in) status = 'partial';
 
+    // ✅ Log the attendance before update
+    console.log("Before Update:", { sign_in_time, sign_out_time, signed_in, signed_out, punctuality });
+
     // 6️⃣ Update attendance record
     await pool.query(
       `UPDATE attendance
@@ -311,6 +326,9 @@ router.post('/admin', async (req, res) => {
       [sign_in_time, sign_out_time, signed_in, signed_out, status, punctuality, existing.id]
     );
 
+    // ✅ Log the attendance after update
+    console.log("After Update:", { sign_in_time, sign_out_time, signed_in, signed_out, punctuality });
+
     // 7️⃣ Return response
     return res.json({
       uid,
@@ -318,7 +336,7 @@ router.post('/admin', async (req, res) => {
       timestamp: now,
       message: getMessage(lang, 'scan.adminMarked'),
       sign: 1,
-      flag: 'manual',
+      flag: punctuality, // send punctuality info back
     });
 
   } catch (err) {
