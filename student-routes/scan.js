@@ -253,8 +253,7 @@ router.post('/admin', async (req, res) => {
       }
     }
 
-
-     // 4. Fetch the school's time settings for sign-in/out
+    // 3. Fetch the school's time settings for sign-in/out
     const timeSettingsRes = await pool.query(
       `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
        FROM time_settings WHERE api_key = $1 LIMIT 1`,
@@ -270,7 +269,6 @@ router.post('/admin', async (req, res) => {
 
     const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
 
-  
     // Convert to Date objects
     const signInStart = new Date(`${dateStr}T${sign_in_start}`);
     const signInEnd = new Date(`${dateStr}T${sign_in_end}`);
