@@ -216,57 +216,61 @@ router.post('/admin', async (req, res) => {
   if (!uid) {
     return res.status(400).json({
       message: getMessage(lang, 'scan.missingFields'),
-      sign: 0
+      sign: 0,
     });
   }
 
   try {
     const dateStr = now.toISOString().slice(0, 10);
 
-    // Ensure daily attendance exists
-    const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
-    if (parseInt(attendanceCheck.rows[0].count) === 0) {
-      const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
-      for (const s of allStudents.rows) {
-        await pool.query(
-          `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key, punctuality)
-           VALUES ($1, $2, $3, $4, false, false, 'absent', $5, 'not_checked')`,
-          [s.uid, s.name, s.form, dateStr, s.api_key]
-        );
-      }
+    // 1️⃣ Fetch student info
+    const studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
+    if (studentRes.rows.length === 0) {
+      return res.status(404).json({
+        message: getMessage(lang, 'scan.uidNotRegistered'),
+        sign: 0,
+      });
     }
+    const student = studentRes.rows[0];
 
-    // Fetch today's attendance record
-    const attendanceRes = await pool.query(
+    // 2️⃣ Ensure an attendance row exists for today
+    let attendanceRes = await pool.query(
       'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
       [uid, dateStr]
     );
 
+    let existing;
     if (attendanceRes.rows.length === 0) {
-      return res.status(404).json({
-        message: getMessage(lang, 'scan.attendanceNotFound'),
-        sign: 0
-      });
+      // Insert new row if missing
+      const insertRes = await pool.query(
+        `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key, punctuality)
+         VALUES ($1, $2, $3, $4, false, false, 'absent', $5, 'not_checked')
+         RETURNING *`,
+        [student.uid, student.name, student.form, dateStr, student.api_key]
+      );
+      existing = insertRes.rows[0];
+    } else {
+      existing = attendanceRes.rows[0];
     }
 
-    const existing = attendanceRes.rows[0];
     let { sign_in_time, sign_out_time, signed_in, signed_out, punctuality } = existing;
 
-    // 🔹 Fetch time settings for this student's school
+    // 3️⃣ Fetch school's time settings
     const timeSettingsRes = await pool.query(
       `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
        FROM time_settings WHERE api_key = $1 LIMIT 1`,
-      [existing.api_key]
+      [student.api_key]
     );
 
     if (timeSettingsRes.rows.length === 0) {
       return res.status(400).json({
         message: getMessage(lang, 'timeSettings.notFound'),
-        sign: 0
+        sign: 0,
       });
     }
 
     const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
+
     const signInStart = new Date(`${dateStr}T${sign_in_start}`);
     const signInEnd = new Date(`${dateStr}T${sign_in_end}`);
     const signOutStart = new Date(`${dateStr}T${sign_out_start}`);
@@ -278,11 +282,11 @@ router.post('/admin', async (req, res) => {
     const isLateSignIn = now > signInEnd && now <= signInLateLimit;
     const isSignOutTime = now >= signOutStart && now <= signOutEnd;
 
-    // Manually mark attendance, but still respecting time rules
+    // 4️⃣ Mark attendance manually (respecting time rules)
     if (!signed_in && (isOfficialSignIn || isLateSignIn)) {
       sign_in_time = now;
       signed_in = true;
-      punctuality = 'manual'; // mark that it was manually done
+      punctuality = 'manual';
     } else if (!signed_out && isSignOutTime) {
       sign_out_time = now;
       signed_out = true;
@@ -290,16 +294,16 @@ router.post('/admin', async (req, res) => {
       return res.status(400).json({
         message: getMessage(lang, 'scan.outsideTime'),
         sign: 0,
-        flag: getMessage(lang, 'scan.outsideFlag')
+        flag: getMessage(lang, 'scan.outsideFlag'),
       });
     }
 
-    // Determine final status
+    // 5️⃣ Determine final status
     let status = 'absent';
     if (signed_in && signed_out) status = 'present';
     else if (signed_in) status = 'partial';
 
-    // Update record
+    // 6️⃣ Update attendance record
     await pool.query(
       `UPDATE attendance
        SET sign_in_time = $1, sign_out_time = $2, signed_in = $3, signed_out = $4, status = $5, punctuality = $6
@@ -307,13 +311,14 @@ router.post('/admin', async (req, res) => {
       [sign_in_time, sign_out_time, signed_in, signed_out, status, punctuality, existing.id]
     );
 
+    // 7️⃣ Return response
     return res.json({
       uid,
-      name: existing.name,
+      name: student.name,
       timestamp: now,
       message: getMessage(lang, 'scan.adminMarked'),
       sign: 1,
-      flag: 'manual'
+      flag: 'manual',
     });
 
   } catch (err) {
@@ -323,7 +328,7 @@ router.post('/admin', async (req, res) => {
       timestamp: new Date(),
       message: getMessage(lang, 'scan.failed'),
       error: err.message,
-      sign: 0
+      sign: 0,
     });
   }
 });
