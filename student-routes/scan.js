@@ -213,7 +213,6 @@ router.post('/admin', async (req, res) => {
   const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
   const now = new Date();
 
-  // Validate request body
   if (!uid) {
     return res.status(400).json({
       message: getMessage(lang, 'scan.missingFields'),
@@ -222,9 +221,9 @@ router.post('/admin', async (req, res) => {
   }
 
   try {
-    const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    const dateStr = now.toISOString().slice(0, 10);
 
-    // 1. Ensure daily attendance records exist for all students
+    // Ensure daily attendance exists
     const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
     if (parseInt(attendanceCheck.rows[0].count) === 0) {
       const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
@@ -237,7 +236,7 @@ router.post('/admin', async (req, res) => {
       }
     }
 
-    // 2. Fetch today's attendance record for this uid
+    // Fetch today's attendance record
     const attendanceRes = await pool.query(
       'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
       [uid, dateStr]
@@ -253,22 +252,54 @@ router.post('/admin', async (req, res) => {
     const existing = attendanceRes.rows[0];
     let { sign_in_time, sign_out_time, signed_in, signed_out, punctuality } = existing;
 
-    // 3. Mark attendance manually by admin → force sign-in (and allow sign-out if needed)
-    if (!signed_in) {
-      sign_in_time = now;
-      signed_in = true;
-      punctuality = 'manual'; // special marker for admin entries
-    } else if (!signed_out) {
-      sign_out_time = now;
-      signed_out = true;
+    // 🔹 Fetch time settings for this student's school
+    const timeSettingsRes = await pool.query(
+      `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
+       FROM time_settings WHERE api_key = $1 LIMIT 1`,
+      [existing.api_key]
+    );
+
+    if (timeSettingsRes.rows.length === 0) {
+      return res.status(400).json({
+        message: getMessage(lang, 'timeSettings.notFound'),
+        sign: 0
+      });
     }
 
-    // 4. Determine final status
+    const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
+    const signInStart = new Date(`${dateStr}T${sign_in_start}`);
+    const signInEnd = new Date(`${dateStr}T${sign_in_end}`);
+    const signOutStart = new Date(`${dateStr}T${sign_out_start}`);
+    const signOutEnd = new Date(`${dateStr}T${sign_out_end}`);
+    const signInLateLimit = new Date(signInEnd);
+    signInLateLimit.setHours(signInLateLimit.getHours() + 1);
+
+    const isOfficialSignIn = now >= signInStart && now <= signInEnd;
+    const isLateSignIn = now > signInEnd && now <= signInLateLimit;
+    const isSignOutTime = now >= signOutStart && now <= signOutEnd;
+
+    // Manually mark attendance, but still respecting time rules
+    if (!signed_in && (isOfficialSignIn || isLateSignIn)) {
+      sign_in_time = now;
+      signed_in = true;
+      punctuality = 'manual'; // mark that it was manually done
+    } else if (!signed_out && isSignOutTime) {
+      sign_out_time = now;
+      signed_out = true;
+    } else if (!signed_in && !isOfficialSignIn && !isLateSignIn && !isSignOutTime) {
+      return res.status(400).json({
+        message: getMessage(lang, 'scan.outsideTime'),
+        sign: 0,
+        flag: getMessage(lang, 'scan.outsideFlag')
+      });
+    }
+
+    // Determine final status
     let status = 'absent';
     if (signed_in && signed_out) status = 'present';
     else if (signed_in) status = 'partial';
 
-    // 5. Update record
+    // Update record
     await pool.query(
       `UPDATE attendance
        SET sign_in_time = $1, sign_out_time = $2, signed_in = $3, signed_out = $4, status = $5, punctuality = $6
@@ -276,7 +307,6 @@ router.post('/admin', async (req, res) => {
       [sign_in_time, sign_out_time, signed_in, signed_out, status, punctuality, existing.id]
     );
 
-    // 6. Return response
     return res.json({
       uid,
       name: existing.name,
@@ -297,5 +327,6 @@ router.post('/admin', async (req, res) => {
     });
   }
 });
+
 
 module.exports = router;
