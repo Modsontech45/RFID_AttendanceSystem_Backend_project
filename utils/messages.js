@@ -45,6 +45,7 @@ const messages = {
       failed: 'Registration failed.'
     },
     scan: {
+      adminMarked: 'marked',
       late: 'late',
   missingFields: 'uid and device_uid are required.',
   uidNotRegistered: 'New UID - Registration required',
@@ -171,6 +172,7 @@ teacher: {
       failed: "L'enregistrement a échoué."
     },
    scan: {
+    adminMarked: 'marqué',
     late: 'En retard',
   missingFields: 'uid et device_uid sont requis.',
   uidNotRegistered: 'Nouvel UID - Enregistrement requis',

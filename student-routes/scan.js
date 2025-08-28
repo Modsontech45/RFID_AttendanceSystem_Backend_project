@@ -206,4 +206,96 @@ router.get('/queue', (req, res) => {
   return res.json([]);
 });
 
+
+
+router.post('/admin', async (req, res) => {
+  const { uid } = req.body;
+  const lang = req.headers['accept-language']?.toLowerCase().split(',')[0] || 'en';
+  const now = new Date();
+
+  // Validate request body
+  if (!uid) {
+    return res.status(400).json({
+      message: getMessage(lang, 'scan.missingFields'),
+      sign: 0
+    });
+  }
+
+  try {
+    const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // 1. Ensure daily attendance records exist for all students
+    const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
+    if (parseInt(attendanceCheck.rows[0].count) === 0) {
+      const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
+      for (const s of allStudents.rows) {
+        await pool.query(
+          `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key, punctuality)
+           VALUES ($1, $2, $3, $4, false, false, 'absent', $5, 'not_checked')`,
+          [s.uid, s.name, s.form, dateStr, s.api_key]
+        );
+      }
+    }
+
+    // 2. Fetch today's attendance record for this uid
+    const attendanceRes = await pool.query(
+      'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
+      [uid, dateStr]
+    );
+
+    if (attendanceRes.rows.length === 0) {
+      return res.status(404).json({
+        message: getMessage(lang, 'scan.attendanceNotFound'),
+        sign: 0
+      });
+    }
+
+    const existing = attendanceRes.rows[0];
+    let { sign_in_time, sign_out_time, signed_in, signed_out, punctuality } = existing;
+
+    // 3. Mark attendance manually by admin → force sign-in (and allow sign-out if needed)
+    if (!signed_in) {
+      sign_in_time = now;
+      signed_in = true;
+      punctuality = 'manual'; // special marker for admin entries
+    } else if (!signed_out) {
+      sign_out_time = now;
+      signed_out = true;
+    }
+
+    // 4. Determine final status
+    let status = 'absent';
+    if (signed_in && signed_out) status = 'present';
+    else if (signed_in) status = 'partial';
+
+    // 5. Update record
+    await pool.query(
+      `UPDATE attendance
+       SET sign_in_time = $1, sign_out_time = $2, signed_in = $3, signed_out = $4, status = $5, punctuality = $6
+       WHERE id = $7`,
+      [sign_in_time, sign_out_time, signed_in, signed_out, status, punctuality, existing.id]
+    );
+
+    // 6. Return response
+    return res.json({
+      uid,
+      name: existing.name,
+      timestamp: now,
+      message: getMessage(lang, 'scan.adminMarked'),
+      sign: 1,
+      flag: 'manual'
+    });
+
+  } catch (err) {
+    console.error('❌ Error processing admin attendance:', err.message);
+    return res.status(500).json({
+      uid: req.body.uid || null,
+      timestamp: new Date(),
+      message: getMessage(lang, 'scan.failed'),
+      error: err.message,
+      sign: 0
+    });
+  }
+});
+
 module.exports = router;
