@@ -12,7 +12,7 @@ router.post('/', async (req, res) => {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
 
-  // === Validate request body ===
+  // === 1. Validate request body ===
   if (!uid || !device_uid) {
     return res.status(400).json({
       message: getMessage(lang, 'scan.missingFields'),
@@ -21,7 +21,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // === 1. Check if student exists ===
+    // === 2. Check if student exists ===
     const studentRes = await pool.query('SELECT * FROM students WHERE uid = $1', [uid]);
     if (studentRes.rows.length === 0) {
       const notFound = {
@@ -39,7 +39,7 @@ router.post('/', async (req, res) => {
 
     const student = studentRes.rows[0];
 
-    // === 2. Ensure daily attendance rows exist (bulk insert) ===
+    // === 3. Ensure daily attendance rows exist ===
     const attendanceCheck = await pool.query('SELECT COUNT(*) FROM attendance WHERE date = $1', [dateStr]);
     if (parseInt(attendanceCheck.rows[0].count) === 0) {
       const allStudents = await pool.query('SELECT uid, name, form, api_key FROM students');
@@ -52,26 +52,26 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // === 3. Fetch or create this student's attendance row ===
+    // === 4. Fetch or create this student's attendance row ===
     let attendanceRes = await pool.query(
       'SELECT * FROM attendance WHERE uid = $1 AND date = $2',
       [uid, dateStr]
     );
 
-    let existing = attendanceRes.rows[0];
-    if (!existing) {
+    let record = attendanceRes.rows[0];
+    if (!record) {
       const insertRes = await pool.query(
         `INSERT INTO attendance (uid, name, form, date, signed_in, signed_out, status, api_key, punctuality)
          VALUES ($1, $2, $3, $4, false, false, 'absent', $5, 'not_checked')
          RETURNING *`,
         [student.uid, student.name, student.form, dateStr, student.api_key]
       );
-      existing = insertRes.rows[0];
+      record = insertRes.rows[0];
     }
 
-    let { sign_in_time, sign_out_time, signed_in, signed_out, punctuality } = existing;
+    let { signed_in, signed_out, sign_in_time, sign_out_time, punctuality } = record;
 
-    // === 4. Fetch time settings ===
+    // === 5. Fetch time settings ===
     const timeSettingsRes = await pool.query(
       `SELECT sign_in_start, sign_in_end, sign_out_start, sign_out_end
        FROM time_settings WHERE api_key = $1 LIMIT 1`,
@@ -87,7 +87,7 @@ router.post('/', async (req, res) => {
 
     const { sign_in_start, sign_in_end, sign_out_start, sign_out_end } = timeSettingsRes.rows[0];
 
-    // Convert to Date objects
+    // Convert times to Date objects
     const signInStart = new Date(`${dateStr}T${sign_in_start}`);
     const signInEnd = new Date(`${dateStr}T${sign_in_end}`);
     const signOutStart = new Date(`${dateStr}T${sign_out_start}`);
@@ -97,12 +97,12 @@ router.post('/', async (req, res) => {
     const signInLateLimit = new Date(signInEnd);
     signInLateLimit.setHours(signInLateLimit.getHours() + 1);
 
-    // Determine current action window
+    // Determine which window the current time falls into
     const isOfficialSignIn = now >= signInStart && now <= signInEnd;
     const isLateSignIn = now > signInEnd && now <= signInLateLimit;
     const isSignOutTime = now >= signOutStart && now <= signOutEnd;
 
-    // === Outside allowed time check ===
+    // === 6. Outside allowed time check ===
     if (!isOfficialSignIn && !isLateSignIn && !isSignOutTime) {
       const outsideTime = {
         uid,
@@ -118,16 +118,17 @@ router.post('/', async (req, res) => {
       return res.json(outsideTime);
     }
 
-    // === 5. Handle sign-in ===
+    // === 7. Handle sign-in ===
     if (!signed_in && (isOfficialSignIn || isLateSignIn)) {
-      sign_in_time = now;
       signed_in = true;
+      sign_in_time = now;
       punctuality = isOfficialSignIn ? 'on_time' : 'late';
     }
 
-    // === 6. Handle sign-out ===
+    // === 8. Handle sign-out ===
     if (isSignOutTime && !signed_out) {
       if (!signed_in) {
+        // Cannot sign out before signing in
         const mustSignInFirst = {
           uid,
           device_uid,
@@ -141,30 +142,35 @@ router.post('/', async (req, res) => {
         latestScans[device_uid] = mustSignInFirst;
         return res.json(mustSignInFirst);
       }
-      sign_out_time = now;
       signed_out = true;
+      sign_out_time = now;
     }
 
-    // === 7. Determine final status ===
+    // === 9. Determine final status ===
     let status = 'absent';
     if (signed_in && signed_out) status = 'present';
     else if (signed_in) status = 'partial';
 
-    // === 8. Update attendance record ===
+    // === 10. Update attendance record ===
     await pool.query(
       `UPDATE attendance
        SET sign_in_time = $1, sign_out_time = $2, signed_in = $3, signed_out = $4,
            status = $5, punctuality = $6
        WHERE id = $7`,
-      [sign_in_time, sign_out_time, signed_in, signed_out, status, punctuality, existing.id]
+      [sign_in_time, sign_out_time, signed_in, signed_out, status, punctuality, record.id]
     );
 
-    // === 9. Prepare response ===
-    const signedMessage = signed_in
-      ? (punctuality === 'on_time'
+    // === 11. Prepare response message ===
+    let signedMessage = '';
+    if (signed_in && !signed_out) {
+      signedMessage = punctuality === 'on_time'
         ? getMessage(lang, 'scan.signedIn')
-        : getMessage(lang, 'scan.late'))
-      : getMessage(lang, 'scan.signedOut');
+        : getMessage(lang, 'scan.late');
+    } else if (signed_in && signed_out) {
+      signedMessage = getMessage(lang, 'scan.signedOut');
+    } else {
+      signedMessage = getMessage(lang, 'scan.absent');
+    }
 
     const scanSuccess = {
       uid,
@@ -200,6 +206,7 @@ router.post('/', async (req, res) => {
     });
   }
 });
+
 
 
 // GET /scan/queue
