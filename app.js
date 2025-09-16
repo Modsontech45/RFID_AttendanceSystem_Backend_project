@@ -17,7 +17,7 @@ const superAdmin = require("./users-routes/superAdmin");
 
 const app = express();
 const port = 3000;
-app.use("/app", express.static(path.join(__dirname, "../public/app")));
+app.use("/app", express.static(path.join(__dirname, "/public/app"))); // <- serve static files
 const allowedOrigins = [
   "http://localhost:8080",
   "capacitor://localhost",
@@ -94,7 +94,7 @@ app.use(bodyParser.json());
 
 
 app.get("/download-app", (req, res) => {
-  const filePath = path.join(__dirname, "../public/app/app-debug.apk");
+  const filePath = path.join(__dirname, "../public/app/afrAttendance.apk");
   res.download(filePath, "Synctuario.apk", (err) => {
     if (err) {
       console.error("Error downloading file:", err);
