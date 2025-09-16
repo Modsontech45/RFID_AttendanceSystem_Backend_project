@@ -1,5 +1,6 @@
 require("dotenv").config();
 require("./cron");
+const path = require("path"); // <- add this
 
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -16,7 +17,7 @@ const superAdmin = require("./users-routes/superAdmin");
 
 const app = express();
 const port = 3000;
-
+app.use("/app", express.static(path.join(__dirname, "../public/app")));
 const allowedOrigins = [
   "http://localhost:8080",
   "capacitor://localhost",
@@ -89,6 +90,21 @@ app.use(cors({
 }));
 // app.options("*", cors());
 app.use(bodyParser.json());
+
+
+
+app.get("/download-app", (req, res) => {
+  const filePath = path.join(__dirname, "../public/app/app-debug.apk");
+  res.download(filePath, "Synctuario.apk", (err) => {
+    if (err) {
+      console.error("Error downloading file:", err);
+      res.status(500).send("Failed to download app");
+    }
+  });
+});
+
+
+
 
 app.use("/api/categories", categoryRoutes); // ✅ REGISTER the route here
 
