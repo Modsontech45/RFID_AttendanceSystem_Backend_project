@@ -19,6 +19,8 @@ const port = 3000;
 
 const allowedOrigins = [
   "http://localhost:8080",
+  "capacitor://localhost",
+  "ionic://localhost",
   "http://127.0.0.1:5500",
   "http://localhost:5173",
   "https://bolt.new",
@@ -31,23 +33,61 @@ const allowedOrigins = [
   // ✅ ADD THIS
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      console.log("🌐 Incoming Origin:", origin);
-      if (!origin) return callback(null, true); // Allow non-browser requests
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        console.error(`❌ CORS blocked: ${origin}`);
-        return callback(new Error("CORS not allowed for this origin"), false);
-      }
-    },
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    credentials: true,
-  })
-);
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       console.log("🌐 Incoming Origin:", origin);
+//       if (!origin) return callback(null, true); // Allow non-browser requests
+//       if (allowedOrigins.includes(origin)) {
+//         return callback(null, true);
+//       } else {
+//         console.error(`❌ CORS blocked: ${origin}`);
+//         return callback(new Error("CORS not allowed for this origin"), false);
+//       }
+//     },
+//     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+//     credentials: true,
+//   })
+// );
 
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) {
+      // No origin (native apps, curl, server-to-server)
+      return callback(null, true);
+    }
+
+    // ✅ Always allow production + capacitor origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // ✅ Allow localhost on http/https with any port
+    if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    // ✅ Allow 127.0.0.1 on http/https with any port
+    if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    // ✅ Allow LAN devices (192.168.x.x and 10.x.x.x ranges)
+    if (
+      /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin) ||
+      /^https?:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/.test(origin)
+    ) {
+      return callback(null, true);
+    }
+
+    // ❌ Anything else is blocked
+    console.warn("❌ Blocked by CORS:", origin);
+    return callback(new Error("CORS not allowed for this origin"), false);
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+}));
+app.options("*", cors());
 app.use(bodyParser.json());
 
 app.use("/api/categories", categoryRoutes); // ✅ REGISTER the route here
