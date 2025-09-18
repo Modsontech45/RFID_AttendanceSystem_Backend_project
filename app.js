@@ -1,6 +1,8 @@
 require("dotenv").config();
 require("./cron");
 const path = require("path"); // <- add this
+const cron = require("node-cron");
+const axios = require("axios");
 
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -124,4 +126,17 @@ app.use("/api/register", require("./student-routes/register"));
 
 app.listen(port, () => {
   console.log(`✅ Server running at http://localhost:${port}`);
+});
+
+// Replace with your deployed Render URL
+const SERVER_URL = "https://rfid-attendancesystem-backend-project.onrender.com/api/scan/health";
+
+// Run every 5 minutes
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    const res = await axios.get(SERVER_URL);
+    console.log(`[CRON] Ping successful: ${res.status}`);
+  } catch (err) {
+    console.error("[CRON] Ping failed:", err.message);
+  }
 });

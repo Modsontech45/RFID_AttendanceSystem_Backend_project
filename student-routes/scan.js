@@ -5,6 +5,9 @@ const getMessage = require('../utils/messages'); // function for multilingual me
 
 // Object to store the latest scan result per device (used for /queue endpoint)
 const latestScans = {};
+router.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
 router.post('/', async (req, res) => {
   const { uid, device_uid } = req.body;
