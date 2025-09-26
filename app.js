@@ -20,9 +20,9 @@ const superAdmin = require("./users-routes/superAdmin");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+// app.listen(PORT, () => {
+//   console.log(`✅ Server running on port ${PORT}`);
+// });
 
 app.use("/app", express.static(path.join(__dirname, "/public/app"))); // <- serve static files
 const allowedOrigins = [
