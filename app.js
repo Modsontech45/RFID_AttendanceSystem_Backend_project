@@ -114,8 +114,8 @@ app.use("/api/attendance", require("./student-routes/attendance"));
 app.use("/api/scan", require("./student-routes/scan"));
 app.use("/api/register", require("./student-routes/register"));
 
-app.listen(port, () => {
-  console.log(`✅ Server running at http://localhost:${port}`);
+app.listen(PORT, () => {
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });
 
 // Replace with your deployed Render URL
