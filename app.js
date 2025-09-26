@@ -85,15 +85,15 @@ app.use(bodyParser.json());
 
 
 
-app.get("/download-app", (req, res) => {
-  const filePath = path.join(__dirname, "../public/app/afrAttendance.apk");
-  res.download(filePath, "Synctuario.apk", (err) => {
-    if (err) {
-      console.error("Error downloading file:", err);
-      res.status(500).send("Failed to download app");
-    }
-  });
-});
+// app.get("/download-app", (req, res) => {
+//   const filePath = path.join(__dirname, "../public/app/afrAttendance.apk");
+//   res.download(filePath, "Synctuario.apk", (err) => {
+//     if (err) {
+//       console.error("Error downloading file:", err);
+//       res.status(500).send("Failed to download app");
+//     }
+//   });
+// });
 
 
 
@@ -118,15 +118,15 @@ app.listen(PORT, () => {
   console.log(`✅ Server running at http://localhost:${PORT}`);
 });
 
-// Replace with your deployed Render URL
-const SERVER_URL = "https://rfid-attendancesystem-backend-project.onrender.com/api/scan/health";
+// // Replace with your deployed Render URL
+// const SERVER_URL = "https://rfid-attendancesystem-backend-project.onrender.com/api/scan/health";
 
-// Run every 5 minutes
-cron.schedule("*/5 * * * *", async () => {
-  try {
-    const res = await axios.get(SERVER_URL);
-    console.log(`[CRON] Ping successful: ${res.status}`);
-  } catch (err) {
-    console.error("[CRON] Ping failed:", err.message);
-  }
-});
+// // Run every 5 minutes
+// cron.schedule("*/5 * * * *", async () => {
+//   try {
+//     const res = await axios.get(SERVER_URL);
+//     console.log(`[CRON] Ping successful: ${res.status}`);
+//   } catch (err) {
+//     console.error("[CRON] Ping failed:", err.message);
+//   }
+// });
