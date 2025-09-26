@@ -1,31 +1,61 @@
-
-require('dotenv').config();
-
+// db/connection.js
 const { Pool } = require('pg');
 
-
-const neonConnectionString = process.env.DATABASE_URL;
-
-
-if (!neonConnectionString) {
-    console.error('DATABASE_URL environment variable is not set.');
-    console.error('Please make sure you have a .env file with DATABASE_URL="your_neon_connection_string".');
-    process.exit(1);
-}
+// Parse the DATABASE_URL
+const connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({
-  connectionString: neonConnectionString,
-
+  connectionString,
   ssl: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false // Required for Neon and most cloud databases
+  },
+  // Connection pool settings
+  max: 10, // Maximum number of connections
+  min: 2,  // Minimum number of connections
+  idleTimeoutMillis: 30000, // 30 seconds
+  connectionTimeoutMillis: 10000, // 10 seconds timeout
+  acquireTimeoutMillis: 10000, // 10 seconds to get connection from pool
+  // Keep alive settings
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 0,
 });
 
+// Test connection on startup
+pool.on('connect', (client) => {
+  console.log('✅ New database connection established');
+});
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-
-  process.exit(-1);
+  console.error('❌ Database connection error:', err);
 });
 
-module.exports = pool;
+// Test the connection
+const testConnection = async () => {
+  try {
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW() as current_time');
+    console.log('✅ Database connected successfully at:', result.rows[0].current_time);
+    client.release();
+    return true;
+  } catch (err) {
+    console.error('❌ Database connection failed:', err.message);
+    return false;
+  }
+};
+
+// Graceful shutdown
+const closePool = async () => {
+  try {
+    await pool.end();
+    console.log('✅ Database pool closed');
+  } catch (err) {
+    console.error('❌ Error closing database pool:', err);
+  }
+};
+
+module.exports = {
+  pool,
+  testConnection,
+  closePool,
+  query: (text, params) => pool.query(text, params)
+};
