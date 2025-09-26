@@ -7,12 +7,23 @@ const pool = require("../db");
 const router = express.Router();
 
 const plans = {
-  starter: "PLN_x6kb1kh4122bm3q",
-  professional: "PLN_td9knl16tw6lp1l",
-  enterprise: "PLN_x6kb1kh4122bm3q",
+  starter: {
+    code: "PLN_x6kb1kh4122bm3q",
+    amount: 8800, // GHS 88.00 in pesewas (smallest currency unit)
+    name: "Starter Plan"
+  },
+  professional: {
+    code: "PLN_td9knl16tw6lp1l", 
+    amount: 18700, // GHS 187.00 in pesewas
+    name: "Professional Plan"
+  },
+  enterprise: {
+    code: "PLN_abc123xyz",
+    amount: 43600, // GHS 436.00 in pesewas  
+    name: "Enterprise Plan"
+  }
 };
 
-// 🔁 Initialize Payment
 router.post("/paystack/initialize", async (req, res) => {
   const { email, plan } = req.body;
 
@@ -20,22 +31,19 @@ router.post("/paystack/initialize", async (req, res) => {
     return res.status(400).json({ message: "Invalid plan" });
   }
 
-  const amountInPesewas = Number(plans[plan]) * 100;
-
-  if (isNaN(amountInPesewas) || amountInPesewas <= 0) {
-    return res.status(400).json({ message: "Invalid amount for the selected plan" });
-  }
-
   try {
+    const selectedPlan = plans[plan];
+    
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email,
-        amount: amountInPesewas,
-        currency: "GHS",
+        amount: selectedPlan.amount, // ✅ Required: amount in pesewas
+        plan: selectedPlan.code,     // ✅ Optional: plan code for subscription
         callback_url: "https://rfid-attendance-synctuario-theta.vercel.app/admin/verify-payment",
         metadata: {
           plan_name: plan,
+          plan_display_name: selectedPlan.name
         },
       },
       {
@@ -60,7 +68,6 @@ router.post("/paystack/initialize", async (req, res) => {
     });
   }
 });
-
 router.get("/paystack/verify/:reference", async (req, res) => {
   const { reference } = req.params;
   console.log(`[Verify] Starting verification for reference: ${reference}`);
