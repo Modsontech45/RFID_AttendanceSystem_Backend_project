@@ -36,22 +36,7 @@ const allowedOrigins = [
   // ✅ ADD THIS
 ];
 
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       console.log("🌐 Incoming Origin:", origin);
-//       if (!origin) return callback(null, true); // Allow non-browser requests
-//       if (allowedOrigins.includes(origin)) {
-//         return callback(null, true);
-//       } else {
-//         console.error(`❌ CORS blocked: ${origin}`);
-//         return callback(new Error("CORS not allowed for this origin"), false);
-//       }
-//     },
-//     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-//     credentials: true,
-//   })
-// );
+
 
 app.use(cors({
   origin: function (origin, callback) {

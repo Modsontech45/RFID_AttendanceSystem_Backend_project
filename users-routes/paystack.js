@@ -7,9 +7,9 @@ const pool = require("../db");
 const router = express.Router();
 
 const plans = {
-  starter: "300",
-  professional: "222",
-  enterprise: "600",
+  starter: "PLN_x6kb1kh4122bm3q",
+  professional: "PLN_td9knl16tw6lp1l",
+  enterprise: "PLN_x6kb1kh4122bm3q",
 };
 
 // 🔁 Initialize Payment
