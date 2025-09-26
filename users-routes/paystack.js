@@ -8,7 +8,7 @@ const router = express.Router();
 
 const plans = {
   starter: {
-    code: "PLN_x6kb1kh4122bm3q",
+    code: "PLN_ebucle4ojvpl5hk",
     amount: 8800, // GHS 88.00 in pesewas (smallest currency unit)
     name: "Starter Plan"
   },
@@ -18,7 +18,7 @@ const plans = {
     name: "Professional Plan"
   },
   enterprise: {
-    code: "PLN_abc123xyz",
+    code: "PLN_x6kb1kh4122bm3q",
     amount: 1300, // GHS 13.00 in pesewas
     name: "Enterprise Plan"
   }
