@@ -19,7 +19,7 @@ const plans = {
   },
   enterprise: {
     code: "PLN_x6kb1kh4122bm3q",
-    amount: 1300, // GHS 13.00 in pesewas
+    amount: 43400, // GHS 434.00 in pesewas
     name: "Enterprise Plan"
   }
 };
