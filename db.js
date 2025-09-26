@@ -17,7 +17,7 @@ const pool = new Pool({
   connectionString: neonConnectionString,
 
   ssl: {
-    rejectUnauthorized: true
+    rejectUnauthorized: false
   }
 });
 
