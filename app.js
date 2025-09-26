@@ -172,7 +172,7 @@ startServer();
 
 // Updated cron job with better error handling
 const SERVER_URL = process.env.NODE_ENV === 'production' 
-  ? "https://rfid-attendancesystem-backend-project-muay.onrender.com/api/scan/health"
+  ? "https://rfid-attendance-system-backend-proj.vercel.app/api/scan/health"
   : `http://localhost:${PORT}/api/scan/health`;
 
 // Run every 14 minutes to prevent Render free tier from sleeping
